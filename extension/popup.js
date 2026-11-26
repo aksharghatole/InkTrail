@@ -11,7 +11,7 @@ function render(){
 }
 async function init(){
  await refresh();[tab]=await chrome.tabs.query({active:true,currentWindow:true});
- try{const u=new URL(tab.url);if(!["http:","https:"].includes(u.protocol))throw Error();pattern=u.protocol+"//"+u.hostname+"/*";$("manualSave").disabled=false;$("ruleTest").disabled=false;const {siteRules={}}=await chrome.storage.local.get("siteRules");const saved=siteRules[u.origin];if(saved){$("rulePath").value=saved.path;$("ruleTitle").value=saved.titleSelector;$("ruleChapter").value=saved.chapterSelector;}const guess=detect({url:tab.url,title:tab.title||""});if(guess){$("manualTitle").value=guess.title;$("manualChapter").value=guess.chapter;}$("site").textContent=u.hostname;const registered=await chrome.scripting.getRegisteredContentScripts({ids:[scriptId(pattern)]});enabled=registered.length>0&&await chrome.permissions.contains({origins:[pattern]});$("toggle").textContent=enabled?"Disable tracking":"Enable tracking";$("toggle").disabled=false}catch{$("site").textContent="Open a reading website to enable tracking."}
+ try{const u=new URL(tab.url);if(!["http:","https:"].includes(u.protocol))throw Error();pattern=u.protocol+"//"+u.hostname+"/*";$("manualSave").disabled=false;$("ruleTest").disabled=false;$("rulePick").disabled=false;const {siteRules={}}=await chrome.storage.local.get("siteRules");const draftKey="picker:"+tab.id;const draft=(await chrome.storage.session.get(draftKey))[draftKey];const fresh=draft?.rule?.origin===u.origin&&Date.now()-draft.createdAt<600000;const saved=fresh?draft.rule:siteRules[u.origin];if(fresh){$("rulePanel").open=true;$("ruleResult").textContent="Visual draft loaded. Check the path, test, then save."; }if(saved){$("rulePath").value=saved.path;$("ruleTitle").value=saved.titleSelector;$("ruleChapter").value=saved.chapterSelector;}const guess=detect({url:tab.url,title:tab.title||""});if(guess){$("manualTitle").value=guess.title;$("manualChapter").value=guess.chapter;}$("site").textContent=u.hostname;const registered=await chrome.scripting.getRegisteredContentScripts({ids:[scriptId(pattern)]});enabled=registered.length>0&&await chrome.permissions.contains({origins:[pattern]});$("toggle").textContent=enabled?"Disable tracking":"Enable tracking";$("toggle").disabled=false}catch{$("site").textContent="Open a reading website to enable tracking."}
 }
 $("toggle").addEventListener("click",async()=>{
  if(!pattern)return;$("toggle").disabled=true;
@@ -34,6 +34,7 @@ $("manualForm").addEventListener("submit",async e=>{
  }catch(e){$("status").textContent=e.message}finally{b.disabled=false}
 });
 let tested=null;
+$("rulePick").onclick=async()=>{try{await chrome.scripting.executeScript({target:{tabId:tab.id},files:["picker.js"]});window.close()}catch(e){$("ruleResult").textContent=e.message}};
 function draftRule(){return validateRule({origin:new URL(tab.url).origin,path:$("rulePath").value,titleSelector:$("ruleTitle").value,chapterSelector:$("ruleChapter").value})}
 for(const id of ["rulePath","ruleTitle","ruleChapter"]){$(id).addEventListener("input",()=>{tested=null;$("ruleSave").disabled=true;$("ruleResult").textContent="Test the rule before saving."})}
 $("ruleTest").onclick=async()=>{
@@ -55,7 +56,7 @@ $("ruleSave").onclick=async()=>{
   const rule=draftRule();if(JSON.stringify(rule)!==tested)throw Error("Test the rule again");
   const response=await chrome.runtime.sendMessage({type:"siteRule",op:"save",rule,tabId:tab.id});
   if(!response?.ok)throw Error(response?.error||"Could not save");
-  $("ruleResult").textContent="Rule saved. Enable site tracking and reload the reading page.";
+  await chrome.storage.session.remove("picker:"+tab.id);$("ruleResult").textContent="Rule saved. Enable site tracking and reload the reading page.";
  }catch(e){$("ruleResult").textContent=e.message}
 };
 $("search").addEventListener("input",render);

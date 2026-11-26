@@ -38,7 +38,7 @@ For an unsupported reader, open the extension popup and expand **Save this chapt
 
 ## Custom website rules
 
-On a reading page, open InkTrail and expand **Teach InkTrail this website**. Enter a reader path prefix (for example /read/), a CSS selector for the series title, and a CSS selector for the numeric chapter label. Use browser Inspect to identify elements. Click Test on current page to preview the title and chapter, then Save tested rule. Enable site tracking and reload. Each origin can have one rule; exact manual URL assignments take priority. A matching rule that fails to extract a valid chapter does not fall back to generic detection, to avoid false positives. Outside the rule path, generic detection continues. Rules read text only, never execute user-supplied code. Unknown query-based routes remain unsupported. Manage website rules lets you delete, export and import rules independently of your library. Importing never grants host permissions, preserves existing rules and does not live-test selectors. After updating the extension, reload existing reading tabs.
+On a reading page, open InkTrail and expand **Teach InkTrail this website**. Enter a reader path prefix (for example /read/), a CSS selector for the series title, and a CSS selector for the numeric chapter label. Use Pick title and chapter on page, click the two text elements, then reopen InkTrail to review the generated selectors. Alternatively use browser Inspect to identify elements. The visual picker stores only a temporary per-tab selector draft, not the selected text, and requires testing and saving before it activates a rule. Escape cancels the picker; drafts expire after ten minutes and are cleared when the tab closes. Click Test on current page to preview the title and chapter, then Save tested rule. Enable site tracking and reload. Each origin can have one rule; exact manual URL assignments take priority. A matching rule that fails to extract a valid chapter does not fall back to generic detection, to avoid false positives. Outside the rule path, generic detection continues. Rules read text only, never execute user-supplied code. Unknown query-based routes remain unsupported. Manage website rules lets you delete, export and import rules independently of your library. Importing never grants host permissions, preserves existing rules and does not live-test selectors. After updating the extension, reload existing reading tabs.
 
 ## Privacy
 
@@ -46,7 +46,7 @@ Only user-enabled websites are eligible for tracking. Page headings, titles, URL
 
 ## Development
 
-No build step or dependencies. Run `node --test tests/*.test.cjs` with Node 22. GitHub Actions tests and packages a ZIP artifact.
+No build step or dependencies. Run `node --test tests/*.test.cjs` with Node 22. GitHub Actions tests and packages a ZIP artifact. A separate browser job uses Playwright and headless Chromium with a local fixture, testing the actual extension service worker, visual picker, backup import and manual read completion. Run locally with npm install --no-save --ignore-scripts playwright@1.56.1, npx playwright install chromium, and node --test tests/browser-smoke.cjs.
 
 ## Roadmap
 
