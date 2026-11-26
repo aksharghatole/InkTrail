@@ -1,8 +1,16 @@
 importScripts("core.js");
 let queue=Promise.resolve();
 chrome.runtime.onMessage.addListener((msg,sender,reply)=>{
- if(msg?.type!=="reading"||!sender.tab||!sender.url)return;
+ const management=msg?.type==="libraryEdit"||msg?.type==="libraryImport";
+ if(management){
+  if(sender.id!==chrome.runtime.id||sender.url!==chrome.runtime.getURL("library.html"))return;
+ }else if(msg?.type!=="reading"||!sender.tab||!sender.url)return;
  queue=queue.catch(()=>{}).then(async()=>{
+  if(management){
+   const {library={}}=await chrome.storage.local.get("library");
+   const updated=msg.type==="libraryEdit"?editLibrary(library,msg.action,Date.now()):combineLibraries(library,validateBackup(msg.data));
+   await chrome.storage.local.set({library:updated});return {ok:true};
+  }
   const u=new URL(sender.url);
   if(!["http:","https:"].includes(u.protocol))return {ok:false};
   const pattern=u.protocol+"//"+u.hostname+"/*";
@@ -17,5 +25,5 @@ chrome.runtime.onMessage.addListener((msg,sender,reply)=>{
   await chrome.storage.local.set({library:{...library,[key]:mergeEntry(library[key],reading,Date.now())}});
   return {ok:true};
  });
- queue.then(reply,()=>reply({ok:false}));return true;
+ queue.then(reply,e=>reply({ok:false,error:String(e.message||e)}));return true;
 });

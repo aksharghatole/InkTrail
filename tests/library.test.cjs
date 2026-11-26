@@ -1,0 +1,12 @@
+const test=require("node:test");const assert=require("node:assert/strict");const {keyFor,mergeEntry,editLibrary,validateBackup,combineLibraries}=require("../extension/core.js");
+const reading={title:"Blue Moon",origin:"https://example.org",url:"https://example.org/manga/blue-moon/chapter-2",chapter:"2",progress:45,completed:false};
+const key=keyFor(reading);const seed=()=>({[key]:mergeEntry(null,reading,1)});
+test("corrected chapter survives repeated automatic tracking",()=>{const l=editLibrary(seed(),{key,op:"correct",chapter:"2",newChapter:"2.5"},2);const s=mergeEntry(l[key],reading,3);assert.deepEqual(Object.keys(s.chapters),["2.5"]);assert.equal(s.lastChapter,"2.5")});
+test("manual completion overrides auto detection",()=>{const l=editLibrary(seed(),{key,op:"complete",chapter:"2",completed:false},2);const s=mergeEntry(l[key],{...reading,completed:true,progress:100},3);assert.equal(s.chapters["2"].completed,false)});
+test("chapter correction does not overwrite collision",()=>{const l=seed();l[key]=mergeEntry(l[key],{...reading,chapter:"3"},2);assert.throws(()=>editLibrary(l,{key,op:"correct",chapter:"2",newChapter:"3"},3),/exists/)});
+test("last chapter deletion removes empty series",()=>assert.deepEqual(editLibrary(seed(),{key,op:"deleteChapter",chapter:"2"},2),{}));
+test("series status persists",()=>{const l=editLibrary(seed(),{key,op:"status",status:"paused"},2);assert.equal(mergeEntry(l[key],reading,3).status,"paused")});
+test("backup rejects malicious URL",()=>{const l=seed();l[key].chapters["2"].url="javascript:alert(1)";assert.throws(()=>validateBackup({version:1,library:l}))});
+test("backup strips private query parameters",()=>{const l=seed();l[key].chapters["2"].url+="?token=secret";assert.equal(validateBackup({version:1,library:l})[key].chapters["2"].url,reading.url)});
+test("merge preserves furthest progress",()=>{const l=seed(),incoming={[key]:mergeEntry(null,{...reading,progress:95,completed:true},2)};assert.equal(combineLibraries(l,incoming)[key].chapters["2"].progress,95)});
+test("backup preserves correction and manual status",()=>{let l=editLibrary(seed(),{key,op:"correct",chapter:"2",newChapter:"2.5"},2);l=editLibrary(l,{key,op:"complete",chapter:"2.5",completed:true},3);const s=validateBackup({version:1,library:l})[key];assert.equal(s.corrections[reading.url],"2.5");assert.equal(s.chapters["2.5"].manualCompletion,true)});

@@ -65,7 +65,99 @@ function keyFor(r){return r.origin+"|"+r.title.normalize("NFKC").toLowerCase().r
 
 function mergeEntry(old,r,now){
  const s=old||{key:keyFor(r),origin:r.origin,chapters:{}};
+ r=resolveReading(s,r);
  const prev=s.chapters[r.chapter];
- return {...s,title:r.title,lastChapter:r.chapter,updatedAt:now,chapters:{...s.chapters,[r.chapter]:{chapter:r.chapter,url:r.url,progress:Math.max(prev?.progress||0,r.progress),completed:Boolean(prev?.completed||r.completed),updatedAt:now}}};
+ return {...s,title:r.title,lastChapter:r.chapter,updatedAt:now,chapters:{...s.chapters,[r.chapter]:{chapter:r.chapter,url:r.url,progress:Math.max(prev?.progress||0,r.progress),completed:typeof prev?.manualCompletion==='boolean'?prev.manualCompletion:Boolean(prev?.completed||r.completed),...(typeof prev?.manualCompletion==='boolean'?{manualCompletion:prev.manualCompletion}:{}),updatedAt:now}}};
 }
-if(typeof module!=='undefined')module.exports={detect,keyFor,mergeEntry,canonicalReaderUrl};
+
+
+function editLibrary(library,action,now){
+ const key=action.key;
+ if(typeof key!=="string"||!Object.hasOwn(library,key))throw Error("Series not found");
+ const s=library[key], next={...library}, chapters={...s.chapters};
+ if(action.op==="deleteSeries"){delete next[key];return next;}
+ if(action.op==="status"){
+  if(!["reading","completed","paused","planned","dropped"].includes(action.status))throw Error("Invalid status");
+  next[key]={...s,status:action.status};return next;
+ }
+ const chapter=action.chapter;
+ if(typeof chapter!=="string"||!Object.hasOwn(chapters,chapter))throw Error("Chapter not found");
+ const c=chapters[chapter];
+ let last=s.lastChapter, corrections={...s.corrections};
+ if(action.op==="complete"){
+  if(typeof action.completed!=="boolean")throw Error("Invalid completion");
+  chapters[chapter]={...c,completed:action.completed,manualCompletion:action.completed};
+ }else if(action.op==="correct"){
+  const raw=String(action.newChapter??"").trim();
+  if(!/^\d+(?:\.\d+)?$/.test(raw)||!Number.isFinite(Number(raw)))throw Error("Enter a numeric chapter");
+  const target=String(Number(raw));
+  if(target===chapter)return library;
+  if(Object.hasOwn(chapters,target))throw Error("Chapter already exists; no data was overwritten");
+  delete chapters[chapter];chapters[target]={...c,chapter:target};
+  for(const url of Object.keys(corrections))if(corrections[url]===chapter)corrections[url]=target;
+  corrections[c.url]=target;
+  if(last===chapter)last=target;
+ }else if(action.op==="deleteChapter"){
+  delete chapters[chapter];
+  for(const url of Object.keys(corrections))if(corrections[url]===chapter)delete corrections[url];
+  const remaining=Object.values(chapters).sort((a,b)=>b.updatedAt-a.updatedAt);
+  if(!remaining.length){delete next[key];return next;}
+  if(last===chapter)last=remaining[0].chapter;
+ }else throw Error("Unsupported action");
+ next[key]={...s,chapters,lastChapter:last,corrections,updatedAt:now};return next;
+}
+
+function resolveReading(series,reading){
+ const chapter=series?.corrections?.[reading.url];
+ return typeof chapter==="string"&&Object.hasOwn(series.chapters,chapter)?{...reading,chapter}:reading;
+}
+
+function validateBackup(data){
+ if(!data||data.version!==1||!data.library||typeof data.library!=="object"||Array.isArray(data.library))throw Error("Invalid InkTrail backup");
+ const safe={};
+ const entries=Object.values(data.library);
+ if(entries.length>5000)throw Error("Backup has too many series");
+ let total=0;
+ for(const s of entries){
+  if(!s||typeof s.title!=="string"||!s.title.trim()||s.title.length>180||!s.chapters||typeof s.chapters!=="object"||Array.isArray(s.chapters))throw Error("Invalid series");
+  const origin=new URL(s.origin);
+  if(!["http:","https:"].includes(origin.protocol)||origin.origin!==s.origin)throw Error("Invalid origin");
+  const chapters={};
+  for(const c of Object.values(s.chapters)){
+   if(++total>50000)throw Error("Backup has too many chapters");
+   if(!c||typeof c.chapter!=="string"||!/^\d+(?:\.\d+)?$/.test(c.chapter)||!Number.isFinite(Number(c.chapter))||String(Number(c.chapter))!==c.chapter||!Number.isFinite(c.progress)||c.progress<0||c.progress>100||!Number.isFinite(c.updatedAt)||typeof c.completed!=="boolean")throw Error("Invalid chapter");
+   const url=new URL(c.url);
+   if(url.origin!==s.origin||url.username||url.password)throw Error("Invalid chapter URL");
+   chapters[c.chapter]={chapter:c.chapter,url:canonicalReaderUrl(url),progress:c.progress,completed:c.completed,updatedAt:c.updatedAt,...(typeof c.manualCompletion==="boolean"?{manualCompletion:c.manualCompletion}:{})};
+  }
+  if(!Object.hasOwn(chapters,s.lastChapter)||!Number.isFinite(s.updatedAt))throw Error("Invalid last chapter");
+  const key=keyFor(s);
+  if(Object.hasOwn(safe,key))throw Error("Duplicate series");
+  const corrections={};
+  for(const [url,chapter] of Object.entries(s.corrections||{})){
+   const parsed=new URL(url);
+   if(parsed.origin===s.origin&&!parsed.username&&!parsed.password&&Object.hasOwn(chapters,chapter))corrections[canonicalReaderUrl(parsed)]=chapter;
+  }
+  safe[key]={key,title:s.title,origin:s.origin,chapters,lastChapter:s.lastChapter,updatedAt:s.updatedAt,corrections,status:["reading","completed","paused","planned","dropped"].includes(s.status)?s.status:"reading"};
+ }
+ return safe;
+}
+
+function combineLibraries(current, incoming){
+ const result={...current};
+ for(const [key,s] of Object.entries(incoming)){
+  if(!Object.hasOwn(result,key)){result[key]=s;continue;}
+  const old=result[key], chapters={...old.chapters};
+  for(const [id,c] of Object.entries(s.chapters)){
+   const prev=chapters[id];
+   if(!prev){chapters[id]=c;continue;}
+   const latest=c.updatedAt>prev.updatedAt?c:prev;
+   const manual=typeof latest.manualCompletion==="boolean"?latest.manualCompletion:typeof prev.manualCompletion==="boolean"?prev.manualCompletion:c.manualCompletion;
+   chapters[id]={...latest,progress:Math.max(prev.progress,c.progress),completed:typeof manual==="boolean"?manual:prev.completed||c.completed,...(typeof manual==="boolean"?{manualCompletion:manual}:{})};
+  }
+  const latest=s.updatedAt>old.updatedAt?s:old;
+  result[key]={...latest,chapters,corrections:{...s.corrections,...old.corrections}};
+ }
+ return result;
+}
+if(typeof module!=='undefined')module.exports={detect,keyFor,mergeEntry,canonicalReaderUrl,editLibrary,validateBackup,combineLibraries};
