@@ -54,7 +54,11 @@ Open Release tracker and enable desktop notifications to grant the optional brow
 
 ## Reading analytics
 
-Open Analytics from Manage library to view daily and rolling 7/30-day active reading estimates, an 84-day calendar, current and longest streaks (at least one minute per day), daily goals, a 30-day story ranking and recent activity. New reading intervals are aggregated by device-local day; a session crossing midnight is assigned to the day it is saved. Up to 730 days are retained; historical library totals and browser history imports are not reconstructed. Clear activity removes daily history without removing chapter records or lifetime chapter time. Analytics are local and are not included in existing backups yet.
+Open Analytics from Manage library to view daily and rolling 7/30-day active reading estimates, an 84-day calendar, current and longest streaks (at least one minute per day), daily goals, a 30-day story ranking and recent activity. New reading intervals are aggregated by device-local day; a session crossing midnight is assigned to the day it is saved. Up to 730 days are retained; historical library totals and browser history imports are not reconstructed. Clear activity removes daily history without removing chapter records or lifetime chapter time. Analytics are local and included in full backups.
+
+## Full backup and restore
+
+Open Full backup from Manage library to export one unencrypted JSON file containing the library, custom rules, subscriptions, daily reading activity and preferences. Restore previews validated counts before a non-destructive merge. Existing rules, follows and preferences win conflicts; chapter progress uses existing library merge rules. Overlapping daily aggregates keep the larger recorded day instead of adding potentially duplicate time. Separate legacy backups remain supported on their original pages. Cached release feeds, alert counts, permissions and temporary picker drafts are not exported. Restored subscriptions can resume checking if API access already exists; otherwise grant access manually. Notification delivery is not enabled by import. Activity outside the retained date window is discarded. Keep the backup private.
 
 ## Privacy
 
