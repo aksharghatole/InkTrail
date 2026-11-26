@@ -1,0 +1,12 @@
+const test=require("node:test"),assert=require("node:assert/strict");const {manualReading,manualMatch,saveManual,keyFor,mergeEntry,editLibrary,validateBackup}=require("../extension/core.js");
+const a={title:"Moon",chapter:"12.5",url:"https://example.org/reader/abc",completed:false};
+test("save unsupported reader with no detection required",()=>{const l=saveManual({},a,1),s=l[keyFor(manualReading(a))];assert.equal(s.lastChapter,"12.5");assert.equal(s.chapters["12.5"].manual,true);assert.equal(manualMatch(l,a.url).title,"Moon")});
+test("explicit completion is sticky during automatic tracking",()=>{const l=saveManual({}, {...a,completed:true},1),r=manualReading(a),s=mergeEntry(l[keyFor(r)],{...r,progress:10,completed:false},2);assert.equal(s.chapters["12.5"].manualCompletion,true);assert.equal(s.chapters["12.5"].completed,true)});
+test("saving without read checkbox does not erase existing completion",()=>{const l=saveManual({}, {...a,completed:true},1);assert.equal(saveManual(l,a,2)[keyFor(manualReading(a))].chapters["12.5"].completed,true)});
+test("reject duplicate manual assignment for same URL",()=>assert.throws(()=>saveManual(saveManual({},a,1),{...a,chapter:"13"},2),/already/));
+test("do not replace another chapter URL",()=>assert.throws(()=>saveManual(saveManual({},a,1),{...a,url:"https://example.org/reader/xyz"},2),/different URL/));
+test("reject unsafe URL and ambiguous generic queries",()=>{for(const url of ["javascript:alert(1)","https://user:pass@example.org/x","https://example.org/x?chapter=1"])assert.throws(()=>manualReading({...a,url}))});
+test("manual marker survives backup",()=>{const l=saveManual({},a,1);assert.deepEqual(manualMatch(validateBackup({version:1,library:l}),a.url),manualMatch(l,a.url))});
+test("corrected manual chapter keeps URL assignment",()=>{const l=saveManual({},a,1),key=keyFor(manualReading(a));const next=editLibrary(l,{key,op:"correct",chapter:"12.5",newChapter:"13"},2);assert.equal(manualMatch(next,a.url).chapter,"13")});
+test("delete removes manual assignment",()=>{const l=saveManual({},a,1);assert.equal(manualMatch(editLibrary(l,{key:keyFor(manualReading(a)),op:"deleteSeries"},2),a.url),null)});
+test("ambiguous imported manual assignments do not resolve automatically",()=>{const l=saveManual({},a,1),other=saveManual({}, {...a,title:"Other"},1);assert.equal(manualMatch({...l,...other},a.url),null)});

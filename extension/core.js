@@ -69,7 +69,7 @@ function mergeEntry(old,r,now){
  const prev=s.chapters[r.chapter];
  const position=cleanPosition(r.position)||(prev?.url===r.url?prev.position:undefined);
  const delta=Number.isFinite(r.seconds)?Math.min(15,Math.max(0,r.seconds)):0;
- return {...s,title:r.title,lastChapter:r.chapter,updatedAt:now,chapters:{...s.chapters,[r.chapter]:{chapter:r.chapter,url:r.url,...(position?{position}:{}),readingSeconds:Math.min(1e9,(prev?.readingSeconds||0)+delta),progress:Math.max(prev?.progress||0,r.progress),completed:typeof prev?.manualCompletion==='boolean'?prev.manualCompletion:Boolean(prev?.completed||r.completed),...(typeof prev?.manualCompletion==='boolean'?{manualCompletion:prev.manualCompletion}:{}),updatedAt:now}}};
+ return {...s,title:r.title,lastChapter:r.chapter,updatedAt:now,chapters:{...s.chapters,[r.chapter]:{chapter:r.chapter,url:r.url,...(r.manual===true||prev?.manual===true&&prev.url===r.url?{manual:true}:{}),...(position?{position}:{}),readingSeconds:Math.min(1e9,(prev?.readingSeconds||0)+delta),progress:Math.max(prev?.progress||0,r.progress),completed:typeof prev?.manualCompletion==='boolean'?prev.manualCompletion:Boolean(prev?.completed||r.completed),...(typeof prev?.manualCompletion==='boolean'?{manualCompletion:prev.manualCompletion}:{}),updatedAt:now}}};
 }
 
 
@@ -131,7 +131,7 @@ function validateBackup(data){
    if(!c||typeof c.chapter!=="string"||!/^\d+(?:\.\d+)?$/.test(c.chapter)||!Number.isFinite(Number(c.chapter))||String(Number(c.chapter))!==c.chapter||!Number.isFinite(c.progress)||c.progress<0||c.progress>100||!Number.isFinite(c.updatedAt)||typeof c.completed!=="boolean")throw Error("Invalid chapter");
    const url=new URL(c.url);
    if(url.origin!==s.origin||url.username||url.password)throw Error("Invalid chapter URL");
-   chapters[c.chapter]={chapter:c.chapter,url:canonicalReaderUrl(url),progress:c.progress,completed:c.completed,updatedAt:c.updatedAt,...(cleanPosition(c.position)?{position:cleanPosition(c.position)}:{}),readingSeconds:Number.isFinite(c.readingSeconds)?Math.max(0,Math.min(1e9,c.readingSeconds)):0,...(typeof c.manualCompletion==="boolean"?{manualCompletion:c.manualCompletion}:{})};
+   chapters[c.chapter]={chapter:c.chapter,url:canonicalReaderUrl(url),progress:c.progress,completed:c.completed,updatedAt:c.updatedAt,...(c.manual===true?{manual:true}:{}),...(cleanPosition(c.position)?{position:cleanPosition(c.position)}:{}),readingSeconds:Number.isFinite(c.readingSeconds)?Math.max(0,Math.min(1e9,c.readingSeconds)):0,...(typeof c.manualCompletion==="boolean"?{manualCompletion:c.manualCompletion}:{})};
   }
   if(!Object.hasOwn(chapters,s.lastChapter)||!Number.isFinite(s.updatedAt))throw Error("Invalid last chapter");
   const key=keyFor(s);
@@ -157,7 +157,7 @@ function combineLibraries(current, incoming){
    if(!prev){chapters[id]=c;continue;}
    const latest=c.updatedAt>prev.updatedAt?c:prev;
    const manual=typeof latest.manualCompletion==="boolean"?latest.manualCompletion:typeof prev.manualCompletion==="boolean"?prev.manualCompletion:c.manualCompletion;
-   chapters[id]={...latest,readingSeconds:Math.max(prev.readingSeconds||0,c.readingSeconds||0),progress:Math.max(prev.progress,c.progress),completed:typeof manual==="boolean"?manual:prev.completed||c.completed,...(typeof manual==="boolean"?{manualCompletion:manual}:{})};
+   chapters[id]={...latest,...(prev.url===c.url&&(prev.manual===true||c.manual===true)?{manual:true}:{}),readingSeconds:Math.max(prev.readingSeconds||0,c.readingSeconds||0),progress:Math.max(prev.progress,c.progress),completed:typeof manual==="boolean"?manual:prev.completed||c.completed,...(typeof manual==="boolean"?{manualCompletion:manual}:{})};
   }
   const latest=s.updatedAt>old.updatedAt?s:old;
   result[key]={...latest,...(old.groupId?{groupId:old.groupId,groupTitle:old.groupTitle}:s.groupId?{groupId:s.groupId,groupTitle:s.groupTitle}:{}),chapters,corrections:{...s.corrections,...old.corrections}};
@@ -245,4 +245,43 @@ function formatReadingTime(seconds){
  const m=Math.floor(Math.max(0,Number(seconds)||0)/60);
  return m>=60?Math.floor(m/60)+"h "+m%60+"m":m+"m";
 }
-if(typeof module!=='undefined')module.exports={detect,keyFor,mergeEntry,canonicalReaderUrl,editLibrary,validateBackup,combineLibraries,titleIdentity,groupedLibrary,cleanPosition,resumeOffset,sessionDelta,formatReadingTime};
+
+
+function manualReading(input){
+ const title=typeof input?.title==="string"?input.title.normalize("NFKC").replace(/\s+/g," ").trim():"";
+ const raw=String(input?.chapter??"").trim();
+ if(!title||title.length>180||!titleIdentity(title))throw Error("Enter a series title (1–180 characters)");
+ if(!/^\d+(?:\.\d+)?$/.test(raw)||!Number.isFinite(Number(raw))||!/^\d+(?:\.\d+)?$/.test(String(Number(raw))))throw Error("Enter a numeric chapter");
+ let u;try{u=new URL(input.url)}catch{throw Error("Enter a valid website URL")}
+ if(!["http:","https:"].includes(u.protocol)||u.username||u.password)throw Error("Only ordinary HTTP(S) URLs are supported");
+ if(u.search&&!canonicalReaderUrl(u).includes("?"))throw Error("This URL contains query parameters. For privacy, use a chapter-specific URL without them.");
+ return {title,chapter:String(Number(raw)),url:canonicalReaderUrl(u),origin:u.origin,progress:input.completed===true?100:0,completed:input.completed===true,manual:true};
+}
+
+function manualMatch(library,url){
+ let found=null;
+ for(const s of Object.values(library)){
+  for(const c of Object.values(s.chapters)){
+   if(c.manual===true&&c.url===url){
+    if(found)return null;
+    found={title:s.title,chapter:c.chapter,url:c.url,origin:s.origin};
+   }
+  }
+ }
+ return found;
+}
+
+function saveManual(library,input,now){
+ const reading=manualReading(input),key=keyFor(reading);
+ for(const s of Object.values(library))for(const c of Object.values(s.chapters)){
+  if(c.manual===true&&c.url===reading.url&&(s.key!==key||c.chapter!==reading.chapter))throw Error("This URL already has a manual chapter assignment; correct or delete the existing entry first");
+ }
+ const s=library[key];
+ const prev=s?.chapters[reading.chapter];
+ if(prev&&prev.url!==reading.url)throw Error("This chapter already has a different URL in this source. No existing data was overwritten.");
+ const next=mergeEntry(s,reading,now);
+ const c=next.chapters[next.lastChapter];
+ if(input.completed===true){c.completed=true;c.manualCompletion=true;}
+ return {...library,[key]:next};
+}
+if(typeof module!=='undefined')module.exports={detect,keyFor,mergeEntry,canonicalReaderUrl,editLibrary,validateBackup,combineLibraries,titleIdentity,groupedLibrary,cleanPosition,resumeOffset,sessionDelta,formatReadingTime,manualReading,manualMatch,saveManual};
