@@ -5,7 +5,7 @@ const {chromium}=require("playwright");
 test("Chromium extension loads, picks elements and imports a reading library",{timeout:120000},async()=>{
  const temp=await fs.mkdtemp(path.join(os.tmpdir(),"inktrail-browser-"));
  const extension=path.join(temp,"extension");
- const server=http.createServer((req,res)=>{res.writeHead(200,{"Content-Type":"text/html"});res.end('<!doctype html><title>Fixture</title><h1 id="series">Fixture Moon</h1><p id="chapter">Chapter 12.5</p><div style="height:3000px"></div>')});
+ const server=http.createServer((req,res)=>{res.writeHead(200,{"Content-Type":"text/html"});res.end('<!doctype html><title>Fixture</title><h1 id="series" style="margin-top:100px">Fixture Moon</h1><p id="chapter">Chapter 12.5</p><div style="height:3000px"></div>')});
  let context;
  try{
   await new Promise(resolve=>server.listen(0,"127.0.0.1",resolve));
