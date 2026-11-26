@@ -11,7 +11,7 @@ function render(){
 }
 async function init(){
  await refresh();[tab]=await chrome.tabs.query({active:true,currentWindow:true});
- try{const u=new URL(tab.url);if(!["http:","https:"].includes(u.protocol))throw Error();pattern=u.protocol+"//"+u.hostname+"/*";$("site").textContent=u.hostname;const registered=await chrome.scripting.getRegisteredContentScripts({ids:[scriptId(pattern)]});enabled=registered.length>0&&await chrome.permissions.contains({origins:[pattern]});$("toggle").textContent=enabled?"Disable tracking":"Enable tracking";$("toggle").disabled=false}catch{$("site").textContent="Open a reading website to enable tracking."}
+ try{const u=new URL(tab.url);if(!["http:","https:"].includes(u.protocol))throw Error();pattern=u.protocol+"//"+u.hostname+"/*";$("manualSave").disabled=false;const guess=detect({url:tab.url,title:tab.title||""});if(guess){$("manualTitle").value=guess.title;$("manualChapter").value=guess.chapter;}$("site").textContent=u.hostname;const registered=await chrome.scripting.getRegisteredContentScripts({ids:[scriptId(pattern)]});enabled=registered.length>0&&await chrome.permissions.contains({origins:[pattern]});$("toggle").textContent=enabled?"Disable tracking":"Enable tracking";$("toggle").disabled=false}catch{$("site").textContent="Open a reading website to enable tracking."}
 }
 $("toggle").addEventListener("click",async()=>{
  if(!pattern)return;$("toggle").disabled=true;
@@ -20,6 +20,18 @@ $("toggle").addEventListener("click",async()=>{
  const scripts=await chrome.scripting.getRegisteredContentScripts({ids:[id]});if(!scripts.length)await chrome.scripting.registerContentScripts([{id,matches:[pattern],js:["core.js","content.js"],runAt:"document_idle",persistAcrossSessions:true}]);enabled=true;
  try{await chrome.scripting.executeScript({target:{tabId:tab.id},files:["core.js","content.js"]});$("status").textContent="Tracking enabled. Read for at least 10 seconds."}catch{$("status").textContent="Tracking enabled. Reload this page to start."}}}
  catch(e){$("status").textContent="Could not change tracking: "+e.message}finally{$("toggle").textContent=enabled?"Disable tracking":"Enable tracking";$("toggle").disabled=false}
+});
+$("manualForm").addEventListener("submit",async e=>{
+ e.preventDefault();if(!tab?.url)return;
+ const b=$("manualSave");b.disabled=true;
+ try{
+  const input={title:$("manualTitle").value,chapter:$("manualChapter").value,completed:$("manualRead").checked,url:tab.url};
+  manualReading(input);
+  const result=await chrome.runtime.sendMessage({type:"manualSave",tabId:tab.id,...input});
+  if(!result?.ok)throw Error(result?.error||"Could not save");
+  $("status").textContent="Chapter saved. Enable site tracking for automatic progress on this URL.";
+  await refresh();
+ }catch(e){$("status").textContent=e.message}finally{b.disabled=false}
 });
 $("search").addEventListener("input",render);
 $("export").addEventListener("click",()=>{const url=URL.createObjectURL(new Blob([JSON.stringify({version:1,library},null,2)],{type:"application/json"}));const a=document.createElement("a");a.href=url;a.download="inktrail-library.json";a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)});

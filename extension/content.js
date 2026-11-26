@@ -1,6 +1,7 @@
 (()=>{
  if(globalThis.__inkTrailRunning)return;
  globalThis.__inkTrailRunning=true;
+ let lookupUrl="",assignment=null,lookupAt=0;
  let key="",lastTime=performance.now(),active=false,visibleSeconds=0,pending=0,lastSaved="",busy=false,offer=null,offerUntil=0,interacted=false,awaitingChoice=false,scrollEvidence=false,lastActivity=performance.now();
  const removeOffer=()=>{offer?.remove();offer=null;offerUntil=0};
  function current(){
@@ -34,7 +35,13 @@
    const now=performance.now(),eligible=document.visibilityState==="visible"&&document.hasFocus()&&now-lastActivity<120000;
    const delta=sessionDelta(lastTime,now,eligible&&active);lastTime=now;active=eligible;
    if(!eligible)return;
-   const r=current();
+   if(lookupUrl!==location.href||now-lookupAt>=15000){
+    const requested=location.href;
+    const result=await chrome.runtime.sendMessage({type:"manualLookup"});
+    if(location.href!==requested)return;
+    lookupUrl=requested;lookupAt=now;assignment=result?.ok?result.assignment:null;
+   }
+   const r=assignment||current();
    if(!r){key="";visibleSeconds=0;pending=0;removeOffer();return;}
    const next=r.url+"|"+r.title+"|"+r.chapter;
    if(key!==next){
