@@ -1,0 +1,12 @@
+const test=require("node:test"),assert=require("node:assert/strict");const {localDay,dayOffset,recordActivity,activitySummary,topStories}=require("../extension/analytics-core.js");
+const now=new Date(2026,10,26,12).getTime(),today=localDay(now);
+test("local date matches calendar",()=>assert.equal(today,"2026-11-26"));
+test("offset handles month and year boundaries",()=>assert.equal(dayOffset("2026-01-01",-1),"2025-12-31"));
+test("activity increments time and story with capped interval",()=>{const a=recordActivity({}, "a",100,now);assert.equal(a[today].seconds,15);assert.equal(a[today].stories.a,15);assert.equal(recordActivity(a,"a",5,now)[today].seconds,20)});
+test("zero and invalid durations ignored",()=>{const a={};assert.equal(recordActivity(a,"a",0,now),a);assert.equal(recordActivity(a,"a",NaN,now),a)});
+test("old activity pruned",()=>{const a=recordActivity({"2020-01-01":{seconds:60,stories:{}}},"a",10,now);assert.equal(a["2020-01-01"],undefined)});
+test("rolling totals and streaks preserve yesterday streak",()=>{const a=Object.fromEntries([1,2,3,8,9].map(i=>[dayOffset(today,-i),{seconds:60}]));const s=activitySummary(a,today);assert.equal(s.current,3);assert.equal(s.longest,3);assert.equal(s.week,180);assert.equal(s.month,300)});
+test("sub-minute days do not count as streaks",()=>assert.equal(activitySummary({[today]:{seconds:59}},today).current,0));
+test("calendar ends today and has 84 days",()=>{const s=activitySummary({},today,30);assert.equal(s.calendar.length,84);assert.equal(s.calendar.at(-1).day,today);assert.equal(s.goal,1800)});
+test("linked sources aggregate and deleted stories excluded",()=>{const a={[today]:{seconds:100,stories:{a:20,b:30,c:50}}},l={a:{title:"Moon",groupId:"g",groupTitle:"Moon"},b:{title:"Moon 2",groupId:"g",groupTitle:"Moon"}};assert.deepEqual(topStories(a,l,today),[{title:"Moon",seconds:50}])});
+test("older story activity excluded from ranking",()=>assert.deepEqual(topStories({[dayOffset(today,-30)]:{stories:{a:50}}},{a:{title:"Moon"}},today),[]));
