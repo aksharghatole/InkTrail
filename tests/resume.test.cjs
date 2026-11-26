@@ -1,0 +1,10 @@
+const test=require("node:test");const assert=require("node:assert/strict");const {cleanPosition,resumeOffset,sessionDelta,mergeEntry,keyFor,validateBackup,combineLibraries}=require("../extension/core.js");
+const r={title:"Moon",origin:"https://example.org",url:"https://example.org/chapter-1",chapter:"1",progress:80,completed:false,position:{top:800,range:1000},seconds:10};
+test("resume uses pixels for similar layouts",()=>assert.equal(resumeOffset(r.position,1020),800));
+test("resume scales across changed layouts",()=>assert.equal(resumeOffset(r.position,2000),1600));
+test("invalid position rejected",()=>assert.equal(cleanPosition({top:999,range:10}),undefined));
+test("focused session timing excludes background and long gaps",()=>{assert.equal(sessionDelta(0,2000,true),2);assert.equal(sessionDelta(0,8000,true),0);assert.equal(sessionDelta(0,2000,false),0)});
+test("latest position independent from furthest progress",()=>{const s=mergeEntry(mergeEntry(null,r,1),{...r,progress:20,position:{top:200,range:1000},seconds:5},2);assert.equal(s.chapters["1"].progress,80);assert.equal(s.chapters["1"].position.top,200);assert.equal(s.chapters["1"].readingSeconds,15)});
+test("backup preserves resume and time",()=>{const key=keyFor(r),s=mergeEntry(null,r,1);const c=validateBackup({version:1,library:{[key]:s}})[key].chapters["1"];assert.deepEqual(c.position,r.position);assert.equal(c.readingSeconds,10)});
+test("backup merge does not double count active time",()=>{const key=keyFor(r),s=mergeEntry(null,r,1);assert.equal(combineLibraries({[key]:s},{[key]:s})[key].chapters["1"].readingSeconds,10)});
+test("position is not carried across different chapter URLs",()=>{const s=mergeEntry(mergeEntry(null,r,1),{...r,url:"https://example.org/other",position:undefined},2);assert.equal(s.chapters["1"].position,undefined)});

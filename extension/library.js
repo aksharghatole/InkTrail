@@ -14,7 +14,7 @@ async function send(message){
 const edit=(key,op,fields={})=>send({type:"libraryEdit",action:{key,op,...fields}});
 function render(){
  const all=Object.values(library).sort((a,b)=>b.updatedAt-a.updatedAt), groups=groupedLibrary(library), chapters=groups.flatMap(g=>g.chapters);
- $("stats").replaceChildren(...[["Stories",groups.length],["Sources",all.length],["Unique chapters",chapters.length],["Chapters read",chapters.filter(c=>c.completed).length]].map(([label,count])=>{const n=node("div",undefined,"stat");n.append(node("strong",count),node("span",label));return n}));
+ $("stats").replaceChildren(...[["Stories",groups.length],["Sources",all.length],["Unique chapters",chapters.length],["Chapters read",chapters.filter(c=>c.completed).length],["Active reading",formatReadingTime(all.flatMap(s=>Object.values(s.chapters)).reduce((n,c)=>n+(c.readingSeconds||0),0))]].map(([label,count])=>{const n=node("div",undefined,"stat");n.append(node("strong",count),node("span",label));return n}));
  const q=$("search").value.trim().toLowerCase(),filter=$("filter").value;
  const entries=all.filter(s=>(s.title.toLowerCase().includes(q)||(s.groupTitle||"").toLowerCase().includes(q))&&(!filter||(s.status||"reading")===filter));
  const visible=new Set(entries.map(s=>s.key));
@@ -47,7 +47,7 @@ function render(){
   article.append(linking);
   const details=node("details");details.open=opened.has(s.key);details.ontoggle=()=>{if(details.open)opened.add(s.key);else opened.delete(s.key)};details.append(node("summary","Chapter history"));
   for(const c of Object.values(s.chapters).sort((a,b)=>Number(b.chapter)-Number(a.chapter))){
-   const row=node("div",undefined,"chapter"),label=node("div"),controls=node("div",undefined,"chapter-actions");label.append(link(c.url,"Chapter "+c.chapter),node("div",c.completed?"Read":c.progress+"% scrolled"));
+   const row=node("div",undefined,"chapter"),label=node("div"),controls=node("div",undefined,"chapter-actions");label.append(link(c.url,"Chapter "+c.chapter),node("div",(c.completed?"Read":c.progress+"% scrolled")+" · "+formatReadingTime(c.readingSeconds)+" active"));
    const bar=node("progress");bar.max=100;bar.value=c.progress;bar.setAttribute("aria-label","Scroll progress");label.append(bar);
    controls.append(button(c.completed?"Mark unread":"Mark read",()=>edit(s.key,"complete",{chapter:c.chapter,completed:!c.completed})));
    const field=node("input");field.type="text";field.inputMode="decimal";field.value=c.chapter;field.setAttribute("aria-label","Correct chapter "+c.chapter);field.disabled=busy;
