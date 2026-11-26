@@ -1,0 +1,13 @@
+const test=require("node:test");const assert=require("node:assert/strict");const {mangaId,chapterNumber,feedChapters,applyFeed,unseenChapters,nextDue}=require("../extension/release-core.js");
+const id="12345678-1234-1234-1234-123456789abc",base={id,language:"en",title:"Moon",readThrough:"5"};
+const row=(chapter,lang="en",idSuffix="1")=>({type:"chapter",id:"12345678-1234-1234-1234-123456789ab"+idSuffix,attributes:{chapter,translatedLanguage:lang,publishAt:"2025-01-01T00:00:00Z"}});
+test("accept title URL and UUID",()=>{assert.equal(mangaId("https://mangadex.org/title/"+id+"/moon"),id);assert.equal(mangaId(id),id)});
+test("reject unrelated host and chapter URL",()=>{assert.equal(mangaId("https://mangadex.org.evil.example/title/"+id),null);assert.equal(mangaId("https://mangadex.org/chapter/"+id),null)});
+test("feed deduplicates translations and normalizes decimals",()=>{const c=feedChapters({result:"ok",data:[row("5.5"),row("05.50","en","2"),row("6","ja"),row("extra"),row("7","en","3")]},"en");assert.deepEqual(c.map(x=>x.chapter),["7","5.5"])});
+test("invalid response is rejected",()=>assert.throws(()=>feedChapters({result:"error"},"en")));
+test("first check establishes baseline without alert",()=>{const f=applyFeed(base,[{chapter:"7"}],1);assert.equal(f.pending,0);assert.equal(f.highest,"7")});
+test("new numeric chapters alert once",()=>{const f=applyFeed(base,[{chapter:"7"}],1);const g=applyFeed(f,[{chapter:"8"},{chapter:"7"}],2);assert.equal(g.pending,1);assert.equal(applyFeed(g,[{chapter:"8"},{chapter:"7"}],3).pending,1)});
+test("older releases do not create new-high alerts",()=>{const f=applyFeed(base,[{chapter:"9"}],1);assert.equal(applyFeed(f,[{chapter:"8"}],2).pending,0)});
+test("count is actual returned chapters not a numeric difference",()=>assert.equal(unseenChapters({...base,chapters:[{chapter:"100"},{chapter:"5"}]}).length,1));
+test("scheduler prioritizes never checked titles",()=>assert.equal(nextDue({a:{id:"a",attemptAt:100},b:{id:"b"}},7*3600000).id,"b"));
+test("invalid chapter rejected",()=>assert.equal(chapterNumber("Infinity"),null));

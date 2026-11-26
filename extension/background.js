@@ -1,4 +1,4 @@
-importScripts("core.js");
+importScripts("core.js","release-core.js","release-service.js");
 let queue=Promise.resolve();
 chrome.runtime.onMessage.addListener((msg,sender,reply)=>{
  const management=msg?.type==="libraryEdit"||msg?.type==="libraryImport";

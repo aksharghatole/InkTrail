@@ -28,9 +28,13 @@ In Manage library, choose another source under a series and click Link stories. 
 
 InkTrail stores the latest vertical page position separately from furthest chapter progress. Reopening an unfinished chapter near its top shows an optional Resume prompt for 30 seconds. Resume uses saved pixels when the layout is similar and proportional position otherwise. Lazy-loaded pages, nested scroll containers and paginated layouts may restore imperfectly. Completed chapters do not prompt automatically. Active time is estimated from focused visible intervals, pauses after two minutes without interaction, and excludes large timing gaps. It is saved periodically, so a quick close or navigation may lose the last few seconds. Backup merges keep the larger time estimate instead of double-counting overlapping exports.
 
+## Release tracking (optional)
+
+Open Release tracker, paste a MangaDex title URL or UUID, set a label, language and manual read-through chapter, then approve access to api.mangadex.org. Followed titles are checked in the background while the browser runs: up to five due titles per 15-minute alarm, each due after six hours. Use Check now for a manual refresh (one minute per-title cooldown). Only selected title IDs and languages are sent to the public API, not reading records. The first successful check establishes a baseline; new higher numbered chapters increase the toolbar badge. Clear new badges acknowledges alerts. The ahead-of-read-through count is limited to distinct numeric chapters in the latest 100 feed records, not the complete catalog. Read-through is manually managed separately from reading history. Release follows are stored locally but not included in reading-library backups yet. API availability and catalog coverage vary; no desktop push notification or live API validation yet.
+
 ## Privacy
 
-Only user-enabled websites are eligible for tracking. Page headings, titles, URL paths, image counts and scroll position are processed locally. No data is sent to a server. Disabling a site retains past history; uninstalling removes local data. Export before uninstalling.
+Only user-enabled websites are eligible for tracking. Page headings, titles, URL paths, image counts and scroll position are processed locally. Reading history is not sent to a server. Optional release checks send selected MangaDex title IDs and languages to its public API. Disabling a site retains past history; uninstalling removes local data. Export before uninstalling.
 
 ## Development
 
@@ -38,4 +42,4 @@ No build step or dependencies. Run `node --test tests/*.test.cjs` with Node 22. 
 
 ## Roadmap
 
-More site adapters, paginated readers, permitted release alerts and optional sync.
+More site adapters, paginated readers, additional release sources, desktop notifications and optional sync.
