@@ -27,7 +27,7 @@ function render(){
   const name=node("input");name.value=g.title;name.maxLength=180;name.setAttribute("aria-label","Linked story name");resume.append(name,button("Rename story",()=>edit(g.sources[0].key,"renameGroup",{title:name.value})));
   card.append(resume);
   const detail=node("details");detail.append(node("summary","Unified chapter history"));
-  for(const c of g.chapters){const row=node("div",undefined,"chapter");row.append(node("strong","Chapter "+c.chapter+" · "+(c.completed?"Read":c.progress+"% scrolled")));const links=node("div",undefined,"actions");for(const source of c.links)links.append(link(source.url,new URL(source.origin).hostname+" · "+source.title));row.append(links);detail.append(row)}
+  for(const c of g.chapters){const row=node("div",undefined,"chapter");row.append(node("strong","Chapter "+c.chapter+" · "+(c.completed?"Read":c.progress+"% progress")));const links=node("div",undefined,"actions");for(const source of c.links)links.append(link(source.url,new URL(source.origin).hostname+" · "+source.title));row.append(links);detail.append(row)}
   card.append(detail);$("groups").append(card);
  }
  $("list").replaceChildren();if(!entries.length){$("list").append(node("p",all.length?"No matching stories.":"Your library is empty. Enable tracking on a reading site to begin.","empty"));return}
@@ -47,8 +47,8 @@ function render(){
   article.append(linking);
   const details=node("details");details.open=opened.has(s.key);details.ontoggle=()=>{if(details.open)opened.add(s.key);else opened.delete(s.key)};details.append(node("summary","Chapter history"));
   for(const c of Object.values(s.chapters).sort((a,b)=>Number(b.chapter)-Number(a.chapter))){
-   const row=node("div",undefined,"chapter"),label=node("div"),controls=node("div",undefined,"chapter-actions");label.append(link(c.url,"Chapter "+c.chapter),node("div",(c.completed?"Read":c.progress+"% scrolled")+" · "+formatReadingTime(c.readingSeconds)+" active"));
-   const bar=node("progress");bar.max=100;bar.value=c.progress;bar.setAttribute("aria-label","Scroll progress");label.append(bar);
+   const row=node("div",undefined,"chapter"),label=node("div"),controls=node("div",undefined,"chapter-actions");label.append(link(c.url,"Chapter "+c.chapter),node("div",(c.completed?"Read":c.progress+"% progress")+" · "+formatReadingTime(c.readingSeconds)+" active"));
+   const bar=node("progress");bar.max=100;bar.value=c.progress;bar.setAttribute("aria-label","Chapter progress");label.append(bar);
    controls.append(button(c.completed?"Mark unread":"Mark read",()=>edit(s.key,"complete",{chapter:c.chapter,completed:!c.completed})));
    const field=node("input");field.type="text";field.inputMode="decimal";field.value=c.chapter;field.setAttribute("aria-label","Correct chapter "+c.chapter);field.disabled=busy;
    controls.append(field,button("Correct",()=>edit(s.key,"correct",{chapter:c.chapter,newChapter:field.value})),button("Delete",()=>{if(confirm("Delete chapter "+c.chapter+"? Tracking can add it again."))edit(s.key,"deleteChapter",{chapter:c.chapter})},"danger"));

@@ -1,0 +1,15 @@
+const test=require("node:test"),assert=require("node:assert/strict");
+const {chapterRoute,readerPage,pageProgress,cleanPage,mergeEntry,validateBackup,keyFor,progressLabel}=require("../extension/core.js");
+const base="https://mangadex.org/chapter/12345678-1234-1234-1234-123456789abc";
+const reading={title:"Moon",chapter:"12",origin:"https://mangadex.org",url:base+"/4",page:{current:4,total:20},progress:20,completed:false};
+test("MangaDex page navigation shares a chapter identity",()=>assert.equal(chapterRoute(base+"/4"),chapterRoute(base+"/8")));
+test("unrelated numeric routes stay distinct",()=>assert.notEqual(chapterRoute("https://example.org/read/4"),chapterRoute("https://example.org/read/8")));
+test("explicit page label supplies total",()=>assert.deepEqual(readerPage(base+"/4",["Page 4 of 20"]),{current:4,total:20}));
+test("MangaDex path works without page total",()=>assert.deepEqual(readerPage(base+"/4",[]),{current:4}));
+test("conflicting page label cannot override URL",()=>assert.deepEqual(readerPage(base+"/4",["Page 5 of 20"]),{current:4}));
+test("generic explicit page counter works",()=>assert.deepEqual(readerPage("https://example.org/read/4",["Page 4 / 20"]),{current:4,total:20}));
+test("invalid counters rejected",()=>{assert.equal(cleanPage({current:9,total:4}),undefined);assert.equal(readerPage("https://example.org/read",["4 of 20"]),undefined)});
+test("unknown total does not invent percentage",()=>assert.equal(pageProgress({current:4}),0));
+test("latest page and URL survive backwards navigation without erasing furthest progress",()=>{const s=mergeEntry(mergeEntry(null,reading,1),{...reading,url:base+"/2",page:{current:2,total:20},progress:10},2);assert.equal(s.chapters["12"].url,base+"/2");assert.equal(s.chapters["12"].page.current,2);assert.equal(s.chapters["12"].progress,20)});
+test("page metadata survives backup and shows correct label",()=>{const key=keyFor(reading),s=mergeEntry(null,reading,1),c=validateBackup({version:1,library:{[key]:s}})[key].chapters["12"];assert.deepEqual(c.page,reading.page);assert.equal(progressLabel(c),"Page 4 / 20")});
+test("paginated reading does not preserve stale scroll position",()=>{const s=mergeEntry(mergeEntry(null,{...reading,page:undefined,position:{top:300,range:1000}},1),reading,2);assert.equal(s.chapters["12"].position,undefined)});
