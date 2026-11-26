@@ -67,9 +67,10 @@ function mergeEntry(old,r,now){
  const s=old||{key:keyFor(r),origin:r.origin,chapters:{}};
  r=resolveReading(s,r);
  const prev=s.chapters[r.chapter];
- const position=cleanPosition(r.position)||(prev?.url===r.url?prev.position:undefined);
+ const page=cleanPage(r.page);
+ const position=page?undefined:cleanPosition(r.position)||(prev?.url===r.url&&!prev.page?prev.position:undefined);
  const delta=Number.isFinite(r.seconds)?Math.min(15,Math.max(0,r.seconds)):0;
- return {...s,title:r.title,lastChapter:r.chapter,updatedAt:now,chapters:{...s.chapters,[r.chapter]:{chapter:r.chapter,url:r.url,...(r.manual===true||prev?.manual===true&&prev.url===r.url?{manual:true}:{}),...(position?{position}:{}),readingSeconds:Math.min(1e9,(prev?.readingSeconds||0)+delta),progress:Math.max(prev?.progress||0,r.progress),completed:typeof prev?.manualCompletion==='boolean'?prev.manualCompletion:Boolean(prev?.completed||r.completed),...(typeof prev?.manualCompletion==='boolean'?{manualCompletion:prev.manualCompletion}:{}),updatedAt:now}}};
+ return {...s,title:r.title,lastChapter:r.chapter,updatedAt:now,chapters:{...s.chapters,[r.chapter]:{chapter:r.chapter,url:r.url,...(page?{page}:{}),...(r.manual===true||prev?.manual===true&&prev.url===r.url?{manual:true}:{}),...(position?{position}:{}),readingSeconds:Math.min(1e9,(prev?.readingSeconds||0)+delta),progress:Math.max(prev?.progress||0,r.progress),completed:typeof prev?.manualCompletion==='boolean'?prev.manualCompletion:Boolean(prev?.completed||r.completed),...(typeof prev?.manualCompletion==='boolean'?{manualCompletion:prev.manualCompletion}:{}),updatedAt:now}}};
 }
 
 
@@ -131,7 +132,7 @@ function validateBackup(data){
    if(!c||typeof c.chapter!=="string"||!/^\d+(?:\.\d+)?$/.test(c.chapter)||!Number.isFinite(Number(c.chapter))||String(Number(c.chapter))!==c.chapter||!Number.isFinite(c.progress)||c.progress<0||c.progress>100||!Number.isFinite(c.updatedAt)||typeof c.completed!=="boolean")throw Error("Invalid chapter");
    const url=new URL(c.url);
    if(url.origin!==s.origin||url.username||url.password)throw Error("Invalid chapter URL");
-   chapters[c.chapter]={chapter:c.chapter,url:canonicalReaderUrl(url),progress:c.progress,completed:c.completed,updatedAt:c.updatedAt,...(c.manual===true?{manual:true}:{}),...(cleanPosition(c.position)?{position:cleanPosition(c.position)}:{}),readingSeconds:Number.isFinite(c.readingSeconds)?Math.max(0,Math.min(1e9,c.readingSeconds)):0,...(typeof c.manualCompletion==="boolean"?{manualCompletion:c.manualCompletion}:{})};
+   chapters[c.chapter]={chapter:c.chapter,url:canonicalReaderUrl(url),progress:c.progress,completed:c.completed,updatedAt:c.updatedAt,...(cleanPage(c.page)?{page:cleanPage(c.page)}:{}),...(c.manual===true?{manual:true}:{}),...(cleanPosition(c.position)?{position:cleanPosition(c.position)}:{}),readingSeconds:Number.isFinite(c.readingSeconds)?Math.max(0,Math.min(1e9,c.readingSeconds)):0,...(typeof c.manualCompletion==="boolean"?{manualCompletion:c.manualCompletion}:{})};
   }
   if(!Object.hasOwn(chapters,s.lastChapter)||!Number.isFinite(s.updatedAt))throw Error("Invalid last chapter");
   const key=keyFor(s);
@@ -284,4 +285,46 @@ function saveManual(library,input,now){
  if(input.completed===true){c.completed=true;c.manualCompletion=true;}
  return {...library,[key]:next};
 }
-if(typeof module!=='undefined')module.exports={detect,keyFor,mergeEntry,canonicalReaderUrl,editLibrary,validateBackup,combineLibraries,titleIdentity,groupedLibrary,cleanPosition,resumeOffset,sessionDelta,formatReadingTime,manualReading,manualMatch,saveManual};
+function chapterRoute(url){
+ let u;try{u=new URL(url)}catch{return url}
+ if(readerKind(u)==="mangadex"){
+  const m=u.pathname.match(/^(\/chapter\/[a-f\d]{8}-[a-f\d]{4}-[a-f\d]{4}-[a-f\d]{4}-[a-f\d]{12})(?:\/\d+)?\/?$/i);
+  if(m)return u.origin+m[1];
+ }
+ return canonicalReaderUrl(u);
+}
+
+function cleanPage(p){
+ if(!p||!Number.isInteger(p.current)||p.current<1||p.current>10000)return undefined;
+ if(p.total===undefined||p.total===null)return {current:p.current};
+ if(!Number.isInteger(p.total)||p.total<p.current||p.total>10000)return undefined;
+ return {current:p.current,total:p.total};
+}
+
+function readerPage(url,labels=[]){
+ let u;try{u=new URL(url)}catch{return undefined}
+ let routePage;
+ if(readerKind(u)==="mangadex"){
+  const m=u.pathname.match(/^\/chapter\/[a-f\d]{8}-[a-f\d]{4}-[a-f\d]{4}-[a-f\d]{4}-[a-f\d]{12}\/(\d+)\/?$/i);
+  if(m)routePage=cleanPage({current:Number(m[1])});
+ }
+ for(const raw of labels.slice(0,20)){
+  const text=String(raw||"").normalize("NFKC").trim();
+  const match=text.match(/^page\s+(\d+)\s*(?:of|\/)\s*(\d+)$/i);
+  if(!match)continue;
+  const p=cleanPage({current:Number(match[1]),total:Number(match[2])});
+  if(p&&(!routePage||routePage.current===p.current))return p;
+ }
+ return routePage;
+}
+
+function pageProgress(p){
+ p=cleanPage(p);
+ return p?.total?Math.round(p.current/p.total*100):0;
+}
+
+function progressLabel(c){
+ if(c.page)return "Page "+c.page.current+(c.page.total?" / "+c.page.total:"");
+ return c.progress+"% scrolled";
+}
+if(typeof module!=='undefined')module.exports={detect,keyFor,mergeEntry,canonicalReaderUrl,editLibrary,validateBackup,combineLibraries,titleIdentity,groupedLibrary,cleanPosition,resumeOffset,sessionDelta,formatReadingTime,manualReading,manualMatch,saveManual,chapterRoute,cleanPage,readerPage,pageProgress,progressLabel};

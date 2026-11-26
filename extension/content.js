@@ -47,21 +47,23 @@
    }
    const r=assignment||current();
    if(!r){key="";visibleSeconds=0;pending=0;removeOffer();return;}
-   const next=r.url+"|"+r.title+"|"+r.chapter;
+   const next=chapterRoute(r.url)+"|"+r.title+"|"+r.chapter;
+   const labels=[...document.querySelectorAll("[aria-label*=page i],.page-counter,.page-number,.reader-pagination,[data-page-counter]")].slice(0,20).flatMap(e=>[e.getAttribute("aria-label"),e.textContent?.slice(0,100)]).filter(Boolean);
+   const page=readerPage(location.href,labels);
    if(key!==next){
     key=next;visibleSeconds=0;pending=0;lastSaved="";interacted=false;awaitingChoice=false;scrollEvidence=false;removeOffer();
     const lookup=await chrome.runtime.sendMessage({type:"resumeLookup",reading:{...r,progress:0}});
-    if(lookup?.ok&&!lookup.completed&&position().top<150)showOffer(lookup.position,next);
+    if(!page&&lookup?.ok&&!lookup.completed&&position().top<150)showOffer(lookup.position,next);
     return;
    }
    visibleSeconds+=delta;pending=Math.min(15,pending+delta);
    if(offer&&now>=offerUntil)removeOffer();
    if(offer||awaitingChoice)return;
-   const p=position(),progress=p.range>100?Math.round(p.top/p.range*100):0;
-   const completed=visibleSeconds>=30&&progress>=90&&scrollEvidence;
-   const signature=next+"|"+Math.round(p.top/20)+"|"+progress+"|"+completed;
+   const p=position(),progress=page?pageProgress(page):p.range>100?Math.round(p.top/p.range*100):0;
+   const completed=!page&&visibleSeconds>=30&&progress>=90&&scrollEvidence;
+   const signature=next+"|"+(page?JSON.stringify(page):Math.round(p.top/20))+"|"+progress+"|"+completed;
    if(visibleSeconds<10||(signature===lastSaved&&pending<10))return;
-   const result=await chrome.runtime.sendMessage({type:"reading",reading:{...r,progress,completed,position:p,seconds:pending}});
+   const result=await chrome.runtime.sendMessage({type:"reading",reading:{...r,progress,completed,...(page?{page}:{position:p}),seconds:pending}});
    if(result?.ok){lastSaved=signature;pending=0;}
   }catch{}finally{busy=false;}
  }

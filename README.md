@@ -44,6 +44,10 @@ On a reading page, open InkTrail and expand **Teach InkTrail this website**. Ent
 
 Open Import history in the library, enter an exact website origin, choose a time window and approve optional browser history access. Preview recognized numeric chapter URLs and select only the chapters to import. Import adds visited chapters with zero reading progress, never marks them read and never overwrites existing chapter records. Old visits do not displace newer resume entries. Scans are limited to 1,000 history search records; unsupported URLs and ambiguous query routes are skipped. Only selected sanitized chapter records are stored locally. Revoke history access on the same page; imported records are retained. No continuous history scanning takes place.
 
+## Paginated readers
+
+InkTrail recognizes MangaDex chapter page routes and explicit English Page X of Y / Page X / Y counters in common page-counter elements. The latest page and URL are stored separately from maximum progress; known page totals supply a percentage. MangaDex page changes inside the same chapter retain a common session identity. Unknown totals show a page number without inventing progress. Resume opens the latest recorded URL; readers that keep the same URL for all pages do not automatically navigate to the stored page. Paginated chapters require manual Mark read, rather than treating the final page as proof that all earlier pages were read. Generic counter recognition is heuristic, and live external reader compatibility remains unverified.
+
 ## Privacy
 
 Only user-enabled websites are eligible for tracking. Page headings, titles, URL paths, image counts and scroll position are processed locally. Reading history is not sent to a server. Optional release checks send selected MangaDex title IDs and languages to its public API. Disabling a site retains past history; uninstalling removes local data. Export before uninstalling.
@@ -56,4 +60,4 @@ No build step or dependencies. Run `node --test tests/*.test.cjs` with Node 22. 
 
 ## Roadmap
 
-More site adapters, paginated readers, additional release sources, desktop notifications and optional sync.
+More site adapters, broader paginated reader support, additional release sources, desktop notifications and optional sync.
