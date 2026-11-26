@@ -1,12 +1,15 @@
-importScripts("core.js","analytics-core.js","history-core.js","rules-core.js","release-core.js","release-service.js");
+importScripts("core.js","analytics-core.js","history-core.js","rules-core.js","release-core.js","backup-core.js","release-service.js");
 let queue=Promise.resolve();
 chrome.runtime.onMessage.addListener((msg,sender,reply)=>{
+ const fullBackup=msg?.type==="fullBackup";
  const analytics=msg?.type==="analyticsAction";
  const management=msg?.type==="libraryEdit"||msg?.type==="libraryImport";
  const manual=msg?.type==="manualSave";
  const historyImport=msg?.type==="historyImport";
  const rules=msg?.type==="siteRule";
- if(analytics){
+ if(fullBackup){
+  if(sender.id!==chrome.runtime.id||sender.url!==chrome.runtime.getURL("backup.html"))return;
+ }else if(analytics){
   if(sender.id!==chrome.runtime.id||sender.url!==chrome.runtime.getURL("analytics.html"))return;
  }else if(management){
   if(sender.id!==chrome.runtime.id||sender.url!==chrome.runtime.getURL("library.html"))return;
@@ -18,6 +21,19 @@ chrome.runtime.onMessage.addListener((msg,sender,reply)=>{
   if(sender.id!==chrome.runtime.id||sender.url!==chrome.runtime.getURL("popup.html"))return;
  }else if(!["reading","resumeLookup","manualLookup"].includes(msg?.type)||!sender.tab||!sender.url||sender.frameId!==0)return;
  queue=queue.catch(()=>{}).then(async()=>{
+  if(fullBackup){
+   if(msg.op!=="import")throw Error("Unsupported backup action");
+   const incoming=validatePortable(msg.data);
+   // Serialize with both reading writes and release checks to prevent lost updates.
+   return releaseTask(async()=>{
+    const current=await chrome.storage.local.get(["library","siteRules","follows","readingActivity","readingGoal","releaseNotifications"]);
+    const merged=mergePortable(current,incoming);
+    await chrome.storage.local.set(merged);
+    await refreshReleaseBadge(merged.follows).catch(()=>{});
+    await ensureReleaseAlarm().catch(()=>{});
+    return {ok:true,counts:backupCounts(merged)};
+   });
+  }
   if(analytics){
    if(msg.op==="goal"){
     if(!Number.isInteger(msg.minutes)||msg.minutes<1||msg.minutes>1440)throw Error("Enter a daily goal from 1 to 1440 minutes");
