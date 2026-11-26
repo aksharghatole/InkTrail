@@ -1,10 +1,13 @@
 (()=>{
  if(globalThis.__inkTrailRunning)return;
  globalThis.__inkTrailRunning=true;
- let lookupUrl="",assignment=null,lookupAt=0;
+ let lookupUrl="",assignment=null,rule=null,lookupAt=0;
  let key="",lastTime=performance.now(),active=false,visibleSeconds=0,pending=0,lastSaved="",busy=false,offer=null,offerUntil=0,interacted=false,awaitingChoice=false,scrollEvidence=false,lastActivity=performance.now();
  const removeOffer=()=>{offer?.remove();offer=null;offerUntil=0};
  function current(){
+  if(rule&&ruleApplies(rule,location.href)){
+   try{return parseRuleReading(rule,location.href,document.querySelector(rule.titleSelector)?.textContent,document.querySelector(rule.chapterSelector)?.textContent)}catch{return null;}
+  }
   return detect({url:location.href,title:document.title,headings:[...document.querySelectorAll("h1,h2")].slice(0,8).map(x=>x.textContent),readerImages:document.querySelectorAll("main img,article img,.reader img,.reading-content img").length});
  }
  function position(){
@@ -39,7 +42,8 @@
     const requested=location.href;
     const result=await chrome.runtime.sendMessage({type:"manualLookup"});
     if(location.href!==requested)return;
-    lookupUrl=requested;lookupAt=now;assignment=result?.ok?result.assignment:null;
+    lookupUrl=requested;lookupAt=now;assignment=result?.ok?result.assignment:null;rule=result?.ok?result.rule:null;
+    if(!result?.ok){key="";removeOffer();return;}
    }
    const r=assignment||current();
    if(!r){key="";visibleSeconds=0;pending=0;removeOffer();return;}

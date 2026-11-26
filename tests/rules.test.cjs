@@ -1,0 +1,12 @@
+const test=require("node:test"),assert=require("node:assert/strict");const {validateRule,ruleApplies,parseRuleReading,validateRulesBackup}=require("../extension/rules-core.js");
+const rule={origin:"https://example.org",path:"/read/",titleSelector:".series",chapterSelector:".chapter"};
+test("rule validation normalizes selectors",()=>assert.equal(validateRule({...rule,titleSelector:" .series "}).titleSelector,".series"));
+test("reject invalid origin and path",()=>{for(const x of [{...rule,origin:"https://example.org/path"},{...rule,origin:"javascript:alert(1)"},{...rule,path:"read/"},{...rule,path:"/read/?secret"}])assert.throws(()=>validateRule(x))});
+test("scope is exact origin and prefix",()=>{assert.equal(ruleApplies(rule,"https://example.org/read/abc"),true);assert.equal(ruleApplies(rule,"https://example.org.evil.test/read/abc"),false);assert.equal(ruleApplies(rule,"https://example.org/catalog"),false)});
+test("parse chapter labels and decimals",()=>assert.deepEqual(parseRuleReading(rule,"https://example.org/read/abc"," Blue Moon ","Chapter 12.5"),{title:"Blue Moon",chapter:"12.5",origin:rule.origin,url:"https://example.org/read/abc"}));
+test("parse multilingual number",()=>assert.equal(parseRuleReading(rule,"https://example.org/read/abc","Moon","第１２話").chapter,"12"));
+test("reject ambiguous labels and missing titles",()=>{assert.equal(parseRuleReading(rule,"https://example.org/read/abc","Moon","Chapter 12 of 20"),null);assert.equal(parseRuleReading(rule,"https://example.org/read/abc","","12"),null)});
+test("reject query-dependent unknown routes",()=>assert.equal(parseRuleReading(rule,"https://example.org/read/abc?chapter=12","Moon","12"),null));
+test("strip fragments",()=>assert.equal(parseRuleReading(rule,"https://example.org/read/abc#panel","Moon","12").url,"https://example.org/read/abc"));
+test("backup roundtrip",()=>assert.deepEqual(validateRulesBackup({version:1,rules:[rule]})[rule.origin],rule));
+test("backup rejects duplicate origin",()=>assert.throws(()=>validateRulesBackup({version:1,rules:[rule,rule]}),/Duplicate/));

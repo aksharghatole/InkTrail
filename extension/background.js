@@ -1,10 +1,13 @@
-importScripts("core.js","release-core.js","release-service.js");
+importScripts("core.js","rules-core.js","release-core.js","release-service.js");
 let queue=Promise.resolve();
 chrome.runtime.onMessage.addListener((msg,sender,reply)=>{
  const management=msg?.type==="libraryEdit"||msg?.type==="libraryImport";
  const manual=msg?.type==="manualSave";
+ const rules=msg?.type==="siteRule";
  if(management){
   if(sender.id!==chrome.runtime.id||sender.url!==chrome.runtime.getURL("library.html"))return;
+ }else if(rules){
+  if(sender.id!==chrome.runtime.id||![chrome.runtime.getURL("popup.html"),chrome.runtime.getURL("rules.html")].includes(sender.url))return;
  }else if(manual){
   if(sender.id!==chrome.runtime.id||sender.url!==chrome.runtime.getURL("popup.html"))return;
  }else if(!["reading","resumeLookup","manualLookup"].includes(msg?.type)||!sender.tab||!sender.url||sender.frameId!==0)return;
@@ -13,6 +16,26 @@ chrome.runtime.onMessage.addListener((msg,sender,reply)=>{
    const {library={}}=await chrome.storage.local.get("library");
    const updated=msg.type==="libraryEdit"?editLibrary(library,msg.action,Date.now()):combineLibraries(library,validateBackup(msg.data));
    await chrome.storage.local.set({library:updated});return {ok:true};
+  }
+  if(rules){
+   const {siteRules={}}=await chrome.storage.local.get("siteRules");
+   if(msg.op==="save"){
+    const rule=validateRule(msg.rule);
+    if(!Number.isInteger(msg.tabId))throw Error("No active reading tab");
+    const tab=await chrome.tabs.get(msg.tabId);
+    if(!tab.active||!tab.url||!ruleApplies(rule,tab.url))throw Error("Open a matching reading page first");
+    if(!Object.hasOwn(siteRules,rule.origin)&&Object.keys(siteRules).length>=200)throw Error("Maximum 200 rules");
+    siteRules[rule.origin]=rule;
+   }else if(msg.op==="delete"){
+    if(typeof msg.origin!=="string"||!Object.hasOwn(siteRules,msg.origin))throw Error("Rule not found");
+    delete siteRules[msg.origin];
+   }else if(msg.op==="import"){
+    const incoming=validateRulesBackup(msg.data);
+    const merged={...incoming,...siteRules};
+    if(Object.keys(merged).length>200)throw Error("Maximum 200 rules");
+    await chrome.storage.local.set({siteRules:merged});return {ok:true};
+   }else throw Error("Unknown rule action");
+   await chrome.storage.local.set({siteRules});return {ok:true};
   }
   if(manual){
    if(!Number.isInteger(msg.tabId))throw Error("No active reading tab");
@@ -31,7 +54,7 @@ chrome.runtime.onMessage.addListener((msg,sender,reply)=>{
   const {library={}}=await chrome.storage.local.get("library");
   const url=canonicalReaderUrl(u);
   const assignment=(!u.search||url.includes("?"))?manualMatch(library,url):null;
-  if(msg.type==="manualLookup")return {ok:true,assignment};
+  if(msg.type==="manualLookup"){const {siteRules={}}=await chrome.storage.local.get("siteRules");return {ok:true,assignment,rule:siteRules[u.origin]||null};}
   const r=msg.reading;
   if(!r||typeof r.title!=="string"||!r.title.trim()||r.title.length>180||typeof r.chapter!=="string"||!/^\d+(?:\.\d+)?$/.test(r.chapter)||!Number.isFinite(Number(r.chapter))||!Number.isFinite(r.progress))return {ok:false};
   const reading={title:assignment?.title||r.title.trim(),chapter:assignment?.chapter||String(Number(r.chapter)),origin:u.origin,url,progress:Math.max(0,Math.min(100,Math.round(r.progress))),completed:r.completed===true&&r.progress>=90,position:cleanPosition(r.position),seconds:typeof r.seconds==="number"?Math.min(15,Math.max(0,r.seconds)):0};
@@ -45,3 +68,5 @@ chrome.runtime.onMessage.addListener((msg,sender,reply)=>{
  });
  queue.then(reply,e=>reply({ok:false,error:String(e.message||e)}));return true;
 });
+
+chrome.runtime.onInstalled.addListener(async details=>{if(details.reason!=="update")return;try{const scripts=await chrome.scripting.getRegisteredContentScripts();const updates=scripts.filter(s=>s.id.startsWith("site-")&&s.js?.includes("content.js")).map(s=>({id:s.id,js:["core.js","rules-core.js","content.js"]}));if(updates.length)await chrome.scripting.updateContentScripts(updates)}catch(e){console.warn("InkTrail registration update failed",e)}});
