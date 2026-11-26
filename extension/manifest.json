@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "InkTrail",
-  "version": "0.10.0",
+  "version": "0.11.0",
   "description": "Private manga, manhua and manhwa reading tracker.",
   "permissions": [
     "storage",
@@ -23,5 +23,8 @@
   "options_ui": {
     "page": "library.html",
     "open_in_tab": true
-  }
+  },
+  "optional_permissions": [
+    "history"
+  ]
 }

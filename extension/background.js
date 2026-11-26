@@ -1,17 +1,25 @@
-importScripts("core.js","rules-core.js","release-core.js","release-service.js");
+importScripts("core.js","history-core.js","rules-core.js","release-core.js","release-service.js");
 let queue=Promise.resolve();
 chrome.runtime.onMessage.addListener((msg,sender,reply)=>{
  const management=msg?.type==="libraryEdit"||msg?.type==="libraryImport";
  const manual=msg?.type==="manualSave";
+ const historyImport=msg?.type==="historyImport";
  const rules=msg?.type==="siteRule";
  if(management){
   if(sender.id!==chrome.runtime.id||sender.url!==chrome.runtime.getURL("library.html"))return;
+ }else if(historyImport){
+  if(sender.id!==chrome.runtime.id||sender.url!==chrome.runtime.getURL("history.html"))return;
  }else if(rules){
   if(sender.id!==chrome.runtime.id||![chrome.runtime.getURL("popup.html"),chrome.runtime.getURL("rules.html")].includes(sender.url))return;
  }else if(manual){
   if(sender.id!==chrome.runtime.id||sender.url!==chrome.runtime.getURL("popup.html"))return;
  }else if(!["reading","resumeLookup","manualLookup"].includes(msg?.type)||!sender.tab||!sender.url||sender.frameId!==0)return;
  queue=queue.catch(()=>{}).then(async()=>{
+  if(historyImport){
+   const {library={}}=await chrome.storage.local.get("library");
+   const result=importHistory(library,msg.rows);
+   await chrome.storage.local.set({library:result.library});return {ok:true,added:result.added,skipped:result.skipped};
+  }
   if(management){
    const {library={}}=await chrome.storage.local.get("library");
    const updated=msg.type==="libraryEdit"?editLibrary(library,msg.action,Date.now()):combineLibraries(library,validateBackup(msg.data));
