@@ -14,7 +14,7 @@ Local-first manga, manhua and manhwa reading tracker for Chromium browsers. No a
 
 ## Current scope
 
-Generic chapter detection from URLs, headings and titles, including decimals, English, French, Spanish, German and common CJK numeric labels. MangaDex chapter routes and WEBTOON viewer routes have initial fixture-tested adapters. WEBTOON preserves only numeric title_no and episode_no identifiers for resume; all other query parameters are removed. On WEBTOON the visible episode label is preferred to the internal episode identifier. Completion is a heuristic (20 visible seconds and 90% page scroll); short or paginated readers may not complete automatically. The extension saves local progress, strips most URL query strings and all fragments, and opens the last chapter without restoring precise scroll position. Query-dependent readers may not resume correctly. Sources are recorded independently and can be explicitly linked into a unified story across websites. Live website compatibility has not yet been verified.
+Generic chapter detection from URLs, headings and titles, including decimals, English, French, Spanish, German and common CJK numeric labels. MangaDex chapter routes and WEBTOON viewer routes have initial fixture-tested adapters. WEBTOON preserves only numeric title_no and episode_no identifiers for resume; all other query parameters are removed. On WEBTOON the visible episode label is preferred to the internal episode identifier. Completion is a heuristic (30 focused active seconds, a scroll-related input and 90% page scroll); short or paginated readers may not complete automatically. The extension saves local progress, strips most URL query strings and all fragments, and offers to restore a saved scroll position on reopening an unfinished chapter. Query-dependent readers may not resume correctly. Sources are recorded independently and can be explicitly linked into a unified story across websites. Live website compatibility has not yet been verified.
 
 ## Manage your library
 
@@ -23,6 +23,10 @@ Open **Manage library** from the popup (or the extension options). Search and fi
 ## Link reading websites
 
 In Manage library, choose another source under a series and click Link stories. Exact normalized title matches appear first as suggestions; no links are created automatically. Linked stories show a unified chapter history, read counts, alternate titles, source-specific resume links and the highest tracked chapter. A chapter is shown as read in the unified view if any source marks it read; underlying source progress is kept independently. Linking existing groups joins their membership. Unlink source restores its independent view without deleting history. Rename story changes the group display label. Links are included in JSON backups; importing an existing source retains its current group if present. Chapter numbers must correspond across sources for the unified view to be meaningful; season offsets are not automatically resolved.
+
+## Resume and active reading time
+
+InkTrail stores the latest vertical page position separately from furthest chapter progress. Reopening an unfinished chapter near its top shows an optional Resume prompt for 30 seconds. Resume uses saved pixels when the layout is similar and proportional position otherwise. Lazy-loaded pages, nested scroll containers and paginated layouts may restore imperfectly. Completed chapters do not prompt automatically. Active time is estimated from focused visible intervals, pauses after two minutes without interaction, and excludes large timing gaps. It is saved periodically, so a quick close or navigation may lose the last few seconds. Backup merges keep the larger time estimate instead of double-counting overlapping exports.
 
 ## Privacy
 
@@ -34,4 +38,4 @@ No build step or dependencies. Run `node --test tests/*.test.cjs` with Node 22. 
 
 ## Roadmap
 
-More site adapters, precise resume, paginated readers, permitted release alerts and optional sync.
+More site adapters, paginated readers, permitted release alerts and optional sync.
