@@ -74,6 +74,7 @@ function mergeEntry(old,r,now){
 function editLibrary(library,action,now){
  const key=action.key;
  if(typeof key!=="string"||!Object.hasOwn(library,key))throw Error("Series not found");
+ if(["link","unlink","renameGroup"].includes(action.op))return groupEdit(library,action);
  const s=library[key], next={...library}, chapters={...s.chapters};
  if(action.op==="deleteSeries"){delete next[key];return next;}
  if(action.op==="status"){
@@ -138,7 +139,8 @@ function validateBackup(data){
    const parsed=new URL(url);
    if(parsed.origin===s.origin&&!parsed.username&&!parsed.password&&Object.hasOwn(chapters,chapter))corrections[canonicalReaderUrl(parsed)]=chapter;
   }
-  safe[key]={key,title:s.title,origin:s.origin,chapters,lastChapter:s.lastChapter,updatedAt:s.updatedAt,corrections,status:["reading","completed","paused","planned","dropped"].includes(s.status)?s.status:"reading"};
+  const group=typeof s.groupId==="string"&&s.groupId.startsWith("linked:")&&s.groupId.length<=2048&&typeof s.groupTitle==="string"&&s.groupTitle.trim()&&s.groupTitle.length<=180?{groupId:s.groupId,groupTitle:s.groupTitle.trim()}:{};
+  safe[key]={...group,key,title:s.title,origin:s.origin,chapters,lastChapter:s.lastChapter,updatedAt:s.updatedAt,corrections,status:["reading","completed","paused","planned","dropped"].includes(s.status)?s.status:"reading"};
  }
  return safe;
 }
@@ -156,8 +158,66 @@ function combineLibraries(current, incoming){
    chapters[id]={...latest,progress:Math.max(prev.progress,c.progress),completed:typeof manual==="boolean"?manual:prev.completed||c.completed,...(typeof manual==="boolean"?{manualCompletion:manual}:{})};
   }
   const latest=s.updatedAt>old.updatedAt?s:old;
-  result[key]={...latest,chapters,corrections:{...s.corrections,...old.corrections}};
+  result[key]={...latest,...(old.groupId?{groupId:old.groupId,groupTitle:old.groupTitle}:s.groupId?{groupId:s.groupId,groupTitle:s.groupTitle}:{}),chapters,corrections:{...s.corrections,...old.corrections}};
  }
  return result;
 }
-if(typeof module!=='undefined')module.exports={detect,keyFor,mergeEntry,canonicalReaderUrl,editLibrary,validateBackup,combineLibraries};
+
+
+function titleIdentity(title){return title.normalize("NFKC").toLowerCase().replace(/[^\p{L}\p{N}]+/gu," ").trim()}
+
+function groupEdit(library,action){
+ const s=library[action.key];
+ if(!Object.hasOwn(library,action.key))throw Error("Series not found");
+ const result={...library};
+ if(action.op==="unlink"){
+  const {groupId,groupTitle,...rest}=s;result[action.key]=rest;return result;
+ }
+ if(action.op==="renameGroup"){
+  if(!s.groupId)throw Error("Link sources first");
+  const label=String(action.title||"").trim();
+  if(!label||label.length>180)throw Error("Enter a group title (1–180 characters)");
+  for(const [key,entry] of Object.entries(result))if(entry.groupId===s.groupId)result[key]={...entry,groupTitle:label};
+  return result;
+ }
+ if(action.op!=="link"||action.key===action.target||!Object.hasOwn(library,action.target))throw Error("Choose another source");
+ const target=library[action.target];
+ if(s.groupId&&s.groupId===target.groupId)return result;
+ let id=target.groupId;
+ if(!id){
+  const used=new Set(Object.values(library).map(e=>e.groupId));
+  const prefix="linked:"+target.key;
+  id=prefix;let i=1;while(used.has(id))id=prefix+":"+i++;
+ }
+ const label=target.groupTitle||target.title;
+ for(const [key,entry] of Object.entries(result)){
+  if(key===action.key||key===action.target||(s.groupId&&entry.groupId===s.groupId)||(target.groupId&&entry.groupId===target.groupId)){
+   result[key]={...entry,groupId:id,groupTitle:label};
+  }
+ }
+ return result;
+}
+
+function groupedLibrary(library){
+ const groups=new Map();
+ for(const s of Object.values(library)){
+  const id=s.groupId?"group:"+s.groupId:"source:"+s.key;
+  if(!groups.has(id))groups.set(id,{id,title:s.groupTitle||s.title,sources:[],chapters:new Map(),updatedAt:0});
+  const g=groups.get(id);
+  g.sources.push(s);g.updatedAt=Math.max(g.updatedAt,s.updatedAt);
+  for(const c of Object.values(s.chapters)){
+   const row=g.chapters.get(c.chapter)||{chapter:c.chapter,completed:false,progress:0,links:[]};
+   row.completed ||= c.completed;
+   row.progress=Math.max(row.progress,c.progress);
+   row.links.push({key:s.key,title:s.title,origin:s.origin,...c});
+   g.chapters.set(c.chapter,row);
+  }
+ }
+ return [...groups.values()].map(g=>{
+  g.sources.sort((a,b)=>b.updatedAt-a.updatedAt);
+  const latest=g.sources[0];
+  const chapters=[...g.chapters.values()].sort((a,b)=>Number(b.chapter)-Number(a.chapter));
+  return {...g,title:latest.groupTitle||latest.title,chapters,last:latest.chapters[latest.lastChapter],readCount:chapters.filter(c=>c.completed).length,aliases:[...new Set(g.sources.map(s=>s.title))]};
+ }).sort((a,b)=>b.updatedAt-a.updatedAt);
+}
+if(typeof module!=='undefined')module.exports={detect,keyFor,mergeEntry,canonicalReaderUrl,editLibrary,validateBackup,combineLibraries,titleIdentity,groupedLibrary};

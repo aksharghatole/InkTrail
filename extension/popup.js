@@ -4,10 +4,10 @@ const scriptId=p=>"site-"+Array.from(p,c=>c.charCodeAt(0).toString(16).padStart(
 function el(tag,text){const node=document.createElement(tag);node.textContent=text;return node}
 async function refresh(){({library={}}=await chrome.storage.local.get("library"));render()}
 function render(){
- const all=Object.values(library).sort((a,b)=>b.updatedAt-a.updatedAt);$("count").textContent=String(all.length);
- const q=$("search").value.trim().toLowerCase();const list=all.filter(x=>x.title.toLowerCase().includes(q));$("library").replaceChildren();
+ const all=groupedLibrary(library);$("count").textContent=String(all.length);
+ const q=$("search").value.trim().toLowerCase();const list=all.filter(x=>x.title.toLowerCase().includes(q)||x.aliases.some(t=>t.toLowerCase().includes(q)));$("library").replaceChildren();
  if(!list.length){const p=el("p",all.length?"No matching series.":"Enable a reading site and open a chapter.");p.className="empty";$("library").append(p);return}
- for(const s of list){const c=s.chapters[s.lastChapter];if(!c)continue;const a=el("article","");a.append(el("strong",s.title),el("p",new URL(s.origin).hostname+" · Chapter "+c.chapter+" · "+(c.completed?"Read":c.progress+"% scrolled")));const bar=document.createElement("progress");bar.max=100;bar.value=c.progress;bar.setAttribute("aria-label","Chapter scroll progress");a.append(bar);const link=el("a","Resume chapter");link.href=c.url;link.target="_blank";link.rel="noopener noreferrer";a.append(link);$("library").append(a)}
+ for(const s of list){const c=s.last;if(!c)continue;const a=el("article","");a.append(el("strong",s.title),el("p",(s.sources.length>1?s.sources.length+" linked sources":new URL(s.sources[0].origin).hostname)+" · Chapter "+c.chapter+" · "+(c.completed?"Read":c.progress+"% scrolled")));const bar=document.createElement("progress");bar.max=100;bar.value=c.progress;bar.setAttribute("aria-label","Chapter scroll progress");a.append(bar);const link=el("a","Resume chapter");link.href=c.url;link.target="_blank";link.rel="noopener noreferrer";a.append(link);$("library").append(a)}
 }
 async function init(){
  await refresh();[tab]=await chrome.tabs.query({active:true,currentWindow:true});

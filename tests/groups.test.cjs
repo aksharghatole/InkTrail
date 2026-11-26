@@ -1,0 +1,15 @@
+const test=require("node:test");const assert=require("node:assert/strict");const {keyFor,mergeEntry,editLibrary,groupedLibrary,validateBackup,combineLibraries,titleIdentity}=require("../extension/core.js");
+const a={title:"Blue Moon",origin:"https://one.example",url:"https://one.example/chapter-1",chapter:"1",progress:100,completed:true};
+const b={title:"Azure Moon",origin:"https://two.example",url:"https://two.example/chapter-1",chapter:"1",progress:20,completed:false};
+const ka=keyFor(a),kb=keyFor(b);const seed=()=>({[ka]:mergeEntry(null,a,1),[kb]:mergeEntry(null,b,2)});
+const linked=()=>editLibrary(seed(),{op:"link",key:ka,target:kb},3);
+test("linking preserves original source histories and deduplicates chapter counts",()=>{const l=linked(),[g]=groupedLibrary(l);assert.equal(g.sources.length,2);assert.equal(g.chapters.length,1);assert.equal(g.readCount,1);assert.equal(g.chapters[0].links.length,2);assert.equal(l[kb].chapters["1"].completed,false)});
+test("unlinked stories stay separate",()=>assert.equal(groupedLibrary(seed()).length,2));
+test("tracking on a linked source stays grouped",()=>{const l=linked();l[ka]=mergeEntry(l[ka],{...a,chapter:"2",url:"https://one.example/chapter-2"},4);const [g]=groupedLibrary(l);assert.equal(g.last.chapter,"2");assert.equal(g.chapters.length,2)});
+test("unlink restores source views",()=>assert.equal(groupedLibrary(editLibrary(linked(),{op:"unlink",key:ka},4)).length,2));
+test("rename persists through tracking",()=>{const l=editLibrary(linked(),{op:"renameGroup",key:ka,title:"Moon"},4);l[ka]=mergeEntry(l[ka],a,5);assert.equal(groupedLibrary(l)[0].title,"Moon")});
+test("linked metadata survives backup roundtrip",()=>assert.equal(groupedLibrary(validateBackup({version:1,library:linked()})).length,1));
+test("import preserves existing link",()=>assert.equal(groupedLibrary(combineLibraries(linked(),seed())).length,1));
+test("title normalization is case and punctuation insensitive",()=>assert.equal(titleIdentity("BLUE—Moon"),titleIdentity("Blue Moon")));
+test("joining two groups preserves every source",()=>{const l=linked();const c={...a,title:"Moon C",origin:"https://three.example",url:"https://three.example/chapter-1"},d={...a,title:"Moon D",origin:"https://four.example",url:"https://four.example/chapter-1"};const kc=keyFor(c),kd=keyFor(d);l[kc]=mergeEntry(null,c,3);l[kd]=mergeEntry(null,d,4);const separate=editLibrary(l,{op:"link",key:kc,target:kd},5);assert.equal(groupedLibrary(separate).length,2);assert.equal(groupedLibrary(editLibrary(separate,{op:"link",key:ka,target:kc},6))[0].sources.length,4)});
+test("link rejects missing target",()=>assert.throws(()=>editLibrary(seed(),{op:"link",key:ka,target:"missing"},3),/Choose/));
