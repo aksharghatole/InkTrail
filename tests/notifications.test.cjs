@@ -1,0 +1,11 @@
+const test=require("node:test"),assert=require("node:assert/strict");
+const {newReleaseChapters,releaseNotification,applyFeed}=require("../extension/release-core.js");
+const f={title:"Moon",language:"en",readThrough:"3",checkedAt:1,highest:"5",chapters:[{chapter:"5"}]};
+test("first check does not send alerts",()=>assert.deepEqual(newReleaseChapters({...f,checkedAt:0},[{chapter:"6"}]),[]));
+test("only new higher chapters alert",()=>assert.deepEqual(newReleaseChapters(f,[{chapter:"7"},{chapter:"6"},{chapter:"5"},{chapter:"4"}]).map(c=>c.chapter),["7","6"]));
+test("linked completed chapter does not alert",()=>assert.equal(newReleaseChapters({...f,libraryKey:"x"},[{chapter:"6"}],{x:{chapters:{"6":{chapter:"6",completed:true}}}}).length,0));
+test("persisted baseline prevents duplicate notification",()=>{const chapters=[{chapter:"6"}],next=applyFeed(f,chapters,2);assert.equal(newReleaseChapters(next,chapters).length,0)});
+test("notification is opt-in",()=>assert.equal(releaseNotification(f,1,{}),null));
+test("generic notification hides story title by default",()=>{const n=releaseNotification(f,2,{enabled:true});assert.equal(n.title,"InkTrail · 2 new chapters");assert.ok(!n.message.includes("Moon"))});
+test("title disclosure requires explicit preference",()=>assert.equal(releaseNotification(f,1,{enabled:true,showTitles:true}).message,"Moon · en"));
+test("zero new chapters never notify",()=>assert.equal(releaseNotification(f,0,{enabled:true}),null));

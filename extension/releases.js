@@ -58,3 +58,36 @@ $("backupFile").onchange=async()=>{
 $("ack").onclick=()=>send({op:"ackAll"});
 chrome.storage.onChanged.addListener((changes,area)=>{if(area==="local"&&(changes.follows||changes.library))load().catch(()=>{})});
 load().catch(e=>$("notice").textContent=e.message);
+
+let notificationEnabled=false,notificationBusy=false;
+async function loadNotificationSettings(){
+ const {releaseNotifications={}}=await chrome.storage.local.get("releaseNotifications");
+ const granted=await chrome.permissions.contains({permissions:["notifications"]});
+ notificationEnabled=releaseNotifications.enabled===true&&granted;
+ $("notifyTitles").checked=releaseNotifications.showTitles===true;
+ $("notifyToggle").textContent=notificationEnabled?"Disable desktop notifications":"Enable desktop notifications";
+ $("notifyTest").disabled=!notificationEnabled;
+ $("notifyStatus").textContent=notificationEnabled?"Desktop alerts enabled; delivery depends on browser and operating system settings.":"Desktop alerts off. Toolbar badges still work.";
+}
+async function setNotificationSettings(enabled,showTitles){
+ const result=await chrome.runtime.sendMessage({type:"releaseAction",op:"notificationSettings",enabled,showTitles});
+ if(!result?.ok)throw Error(result?.error||"Could not save notification settings");
+}
+$("notifyToggle").onclick=async()=>{
+ if(notificationBusy)return;notificationBusy=true;
+ try{
+  const next=!notificationEnabled;
+  if(next&&!await chrome.permissions.request({permissions:["notifications"]}))throw Error("Notification permission declined");
+  await setNotificationSettings(next,$("notifyTitles").checked);
+  if(!next)await chrome.permissions.remove({permissions:["notifications"]});
+  await loadNotificationSettings();
+ }catch(e){$("notifyStatus").textContent=e.message}finally{notificationBusy=false}
+};
+$("notifyTitles").onchange=async()=>{
+ try{await setNotificationSettings(notificationEnabled,$("notifyTitles").checked);await loadNotificationSettings()}catch(e){$("notifyStatus").textContent=e.message}
+};
+$("notifyTest").onclick=async()=>{
+ try{const r=await chrome.runtime.sendMessage({type:"releaseAction",op:"testNotification"});if(!r?.ok)throw Error(r?.error||"Test failed");$("notifyStatus").textContent="Test notification requested. Check your desktop notification center."}catch(e){$("notifyStatus").textContent=e.message}
+};
+chrome.permissions.onRemoved.addListener(()=>loadNotificationSettings().catch(()=>{}));
+loadNotificationSettings().catch(e=>$("notifyStatus").textContent=e.message);
