@@ -38,11 +38,9 @@ function unseenChapters(follow,library={}){
 }
 
 function applyFeed(follow,chapters,now,library={}){
- const previous=new Set((follow.chapters||[]).map(c=>c.chapter));
  const latest=chapters[0]?.chapter;
  const high=follow.highest===undefined?undefined:Number(follow.highest);
- const completed=completedForFollow(follow,library);
- const newCount=follow.checkedAt?chapters.filter(c=>!previous.has(c.chapter)&&high!==undefined&&Number(c.chapter)>high&&Number(c.chapter)>Number(follow.readThrough)&&!completed.has(c.chapter)).length:0;
+ const newCount=newReleaseChapters(follow,chapters,library).length;
  return {...follow,chapters,checkedAt:now,error:"",highest:latest===undefined?follow.highest:String(Math.max(high??-1,Number(latest))),pending:Math.min(999,(follow.pending||0)+newCount)};
 }
 
@@ -88,4 +86,17 @@ function mergeFollows(current,incoming){
  if(Object.keys(merged).length>100)throw Error("Maximum 100 follows; remove subscriptions before importing");
  return merged;
 }
-if(typeof module!=='undefined')module.exports={mangaId,followKey,chapterNumber,feedChapters,unseenChapters,applyFeed,nextDue,completedForFollow,followSuggestions,validateFollowsBackup,exportFollows,mergeFollows};
+function newReleaseChapters(follow,chapters,library={}){
+ if(!follow.checkedAt||follow.highest===undefined)return [];
+ const previous=new Set((follow.chapters||[]).map(c=>c.chapter));
+ const completed=completedForFollow(follow,library);
+ const high=Number(follow.highest),threshold=Number(follow.readThrough);
+ return chapters.filter(c=>!previous.has(c.chapter)&&Number(c.chapter)>high&&Number(c.chapter)>threshold&&!completed.has(c.chapter));
+}
+
+function releaseNotification(follow,count,settings){
+ if(settings?.enabled!==true||!Number.isInteger(count)||count<=0)return null;
+ const message=count===1?"1 new chapter":count+" new chapters";
+ return {title:"InkTrail · "+message,message:settings.showTitles===true?String(follow.title).slice(0,180)+" · "+follow.language:"A followed story has updates. Open InkTrail to view them."};
+}
+if(typeof module!=='undefined')module.exports={mangaId,followKey,chapterNumber,feedChapters,unseenChapters,applyFeed,nextDue,completedForFollow,followSuggestions,validateFollowsBackup,exportFollows,mergeFollows,newReleaseChapters,releaseNotification};
