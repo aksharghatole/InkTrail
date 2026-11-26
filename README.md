@@ -44,6 +44,8 @@ On a reading page, open InkTrail and expand **Teach InkTrail this website**. Ent
 
 Only user-enabled websites are eligible for tracking. Page headings, titles, URL paths, image counts and scroll position are processed locally. Reading history is not sent to a server. Optional release checks send selected MangaDex title IDs and languages to its public API. Disabling a site retains past history; uninstalling removes local data. Export before uninstalling.
 
+Open Privacy from Manage library to review registered reading sites and persistent website permissions separately. Stop individual or all reading registrations without losing data or revoking release API access. Revoke individual permissions when needed; revoking MangaDex API access pauses release checks. Reload existing reader tabs after permission changes.
+
 ## Development
 
 No build step or dependencies. Run `node --test tests/*.test.cjs` with Node 22. GitHub Actions tests and packages a ZIP artifact. A separate browser job uses Playwright and headless Chromium with a local fixture, testing the actual extension service worker, visual picker, backup import and manual read completion. Run locally with npm install --no-save --ignore-scripts playwright@1.56.1, npx playwright install chromium, and node --test tests/browser-smoke.cjs.
