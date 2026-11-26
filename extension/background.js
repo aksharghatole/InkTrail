@@ -1,11 +1,14 @@
-importScripts("core.js","history-core.js","rules-core.js","release-core.js","release-service.js");
+importScripts("core.js","analytics-core.js","history-core.js","rules-core.js","release-core.js","release-service.js");
 let queue=Promise.resolve();
 chrome.runtime.onMessage.addListener((msg,sender,reply)=>{
+ const analytics=msg?.type==="analyticsAction";
  const management=msg?.type==="libraryEdit"||msg?.type==="libraryImport";
  const manual=msg?.type==="manualSave";
  const historyImport=msg?.type==="historyImport";
  const rules=msg?.type==="siteRule";
- if(management){
+ if(analytics){
+  if(sender.id!==chrome.runtime.id||sender.url!==chrome.runtime.getURL("analytics.html"))return;
+ }else if(management){
   if(sender.id!==chrome.runtime.id||sender.url!==chrome.runtime.getURL("library.html"))return;
  }else if(historyImport){
   if(sender.id!==chrome.runtime.id||sender.url!==chrome.runtime.getURL("history.html"))return;
@@ -15,6 +18,14 @@ chrome.runtime.onMessage.addListener((msg,sender,reply)=>{
   if(sender.id!==chrome.runtime.id||sender.url!==chrome.runtime.getURL("popup.html"))return;
  }else if(!["reading","resumeLookup","manualLookup"].includes(msg?.type)||!sender.tab||!sender.url||sender.frameId!==0)return;
  queue=queue.catch(()=>{}).then(async()=>{
+  if(analytics){
+   if(msg.op==="goal"){
+    if(!Number.isInteger(msg.minutes)||msg.minutes<1||msg.minutes>1440)throw Error("Enter a daily goal from 1 to 1440 minutes");
+    await chrome.storage.local.set({readingGoal:msg.minutes});return {ok:true};
+   }
+   if(msg.op==="clear"){await chrome.storage.local.set({readingActivity:{}});return {ok:true};}
+   throw Error("Unknown analytics action");
+  }
   if(historyImport){
    const {library={}}=await chrome.storage.local.get("library");
    const result=importHistory(library,msg.rows);
@@ -73,7 +84,9 @@ chrome.runtime.onMessage.addListener((msg,sender,reply)=>{
    const entry=library[key], corrected=resolveReading(entry,reading), c=entry?.chapters?.[corrected.chapter];
    return {ok:true,position:c?.url===reading.url?cleanPosition(c.position):undefined,completed:Boolean(c?.completed)};
   }
-  await chrome.storage.local.set({library:{...library,[key]:mergeEntry(library[key],reading,Date.now())}});
+  const now=Date.now();
+  const {readingActivity={}}=await chrome.storage.local.get("readingActivity");
+  await chrome.storage.local.set({library:{...library,[key]:mergeEntry(library[key],reading,now)},readingActivity:recordActivity(readingActivity,key,reading.seconds,now)});
   return {ok:true};
  });
  queue.then(reply,e=>reply({ok:false,error:String(e.message||e)}));return true;

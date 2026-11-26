@@ -52,6 +52,10 @@ InkTrail recognizes MangaDex chapter page routes and explicit English Page X of 
 
 Open Release tracker and enable desktop notifications to grant the optional browser permission. Alerts are grouped per followed title and only created for newly discovered higher-numbered unread chapters after the first successful baseline check. Story titles are hidden by default; opt in to including them. Clicking an alert opens the release dashboard. Use Send test notification to check your browser/OS notification settings. Disabling alerts removes the optional notification permission; toolbar badges remain independent. Feed state is saved before requesting desktop notifications to avoid duplicate alerts on retry. Desktop notification delivery is best-effort and may be suppressed by system settings or browser policies.
 
+## Reading analytics
+
+Open Analytics from Manage library to view daily and rolling 7/30-day active reading estimates, an 84-day calendar, current and longest streaks (at least one minute per day), daily goals, a 30-day story ranking and recent activity. New reading intervals are aggregated by device-local day; a session crossing midnight is assigned to the day it is saved. Up to 730 days are retained; historical library totals and browser history imports are not reconstructed. Clear activity removes daily history without removing chapter records or lifetime chapter time. Analytics are local and are not included in existing backups yet.
+
 ## Privacy
 
 Only user-enabled websites are eligible for tracking. Page headings, titles, URL paths, image counts and scroll position are processed locally. Reading history is not sent to a server. Optional release checks send selected MangaDex title IDs and languages to its public API. Disabling a site retains past history; uninstalling removes local data. Export before uninstalling.
