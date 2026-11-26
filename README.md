@@ -14,7 +14,7 @@ Local-first manga, manhua and manhwa reading tracker for Chromium browsers. No a
 
 ## Current scope
 
-Generic English chapter detection from URLs, headings and titles, including decimals. Completion is a heuristic (20 visible seconds and 90% page scroll); short or paginated readers may not complete automatically. The extension saves local progress, strips URL query strings and fragments, and opens the last chapter without restoring precise scroll position. Query-dependent readers may not resume correctly. Series are grouped by title and origin; cross-site merging is not implemented. Live website compatibility has not yet been verified.
+Generic chapter detection from URLs, headings and titles, including decimals, English, French, Spanish, German and common CJK numeric labels. MangaDex chapter routes and WEBTOON viewer routes have initial fixture-tested adapters. WEBTOON preserves only numeric title_no and episode_no identifiers for resume; all other query parameters are removed. On WEBTOON the visible episode label is preferred to the internal episode identifier. Completion is a heuristic (20 visible seconds and 90% page scroll); short or paginated readers may not complete automatically. The extension saves local progress, strips most URL query strings and all fragments, and opens the last chapter without restoring precise scroll position. Query-dependent readers may not resume correctly. Series are grouped by title and origin; cross-site merging is not implemented. Live website compatibility has not yet been verified.
 
 ## Privacy
 
@@ -26,4 +26,4 @@ No build step or dependencies. Run `node --test tests/*.test.cjs` with Node 22. 
 
 ## Roadmap
 
-Site adapters, manual correction/deletion, import, cross-site merging, precise resume, paginated readers, permitted release alerts and optional sync.
+More site adapters, manual correction/deletion, import, cross-site merging, precise resume, paginated readers, permitted release alerts and optional sync.
