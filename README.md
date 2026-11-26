@@ -16,6 +16,10 @@ Local-first manga, manhua and manhwa reading tracker for Chromium browsers. No a
 
 Generic chapter detection from URLs, headings and titles, including decimals, English, French, Spanish, German and common CJK numeric labels. MangaDex chapter routes and WEBTOON viewer routes have initial fixture-tested adapters. WEBTOON preserves only numeric title_no and episode_no identifiers for resume; all other query parameters are removed. On WEBTOON the visible episode label is preferred to the internal episode identifier. Completion is a heuristic (20 visible seconds and 90% page scroll); short or paginated readers may not complete automatically. The extension saves local progress, strips most URL query strings and all fragments, and opens the last chapter without restoring precise scroll position. Query-dependent readers may not resume correctly. Series are grouped by title and origin; cross-site merging is not implemented. Live website compatibility has not yet been verified.
 
+## Manage your library
+
+Open **Manage library** from the popup (or the extension options). Search and filter series, set reading status, expand chapter history, correct chapter numbers, mark chapters read/unread, delete entries, and export or merge a JSON backup. Manual completion overrides subsequent automatic completion; a correction is remembered for its chapter URL. Deleting entries does not block future automatic tracking on that site. Imports validate and sanitize chapter URLs, retain existing series, and merge chapter progress without overwriting higher progress. Back up your library before major changes.
+
 ## Privacy
 
 Only user-enabled websites are eligible for tracking. Page headings, titles, URL paths, image counts and scroll position are processed locally. No data is sent to a server. Disabling a site retains past history; uninstalling removes local data. Export before uninstalling.
@@ -26,4 +30,4 @@ No build step or dependencies. Run `node --test tests/*.test.cjs` with Node 22. 
 
 ## Roadmap
 
-More site adapters, manual correction/deletion, import, cross-site merging, precise resume, paginated readers, permitted release alerts and optional sync.
+More site adapters, cross-site merging, precise resume, paginated readers, permitted release alerts and optional sync.

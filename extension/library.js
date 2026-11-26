@@ -1,0 +1,43 @@
+const $=id=>document.getElementById(id);
+let library={},busy=false;
+const opened=new Set();
+const statuses=["reading","completed","paused","planned","dropped"];
+function node(tag,text,cls){const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(cls)n.className=cls;return n}
+function button(text,fn,cls="secondary"){const b=node("button",text,cls);b.disabled=busy;b.addEventListener("click",fn);return b}
+function link(url,text){const a=node("a",text);try{const u=new URL(url);if(["http:","https:"].includes(u.protocol)){a.href=u.href;a.target="_blank";a.rel="noopener noreferrer"}}catch{}return a}
+async function load(){({library={}}=await chrome.storage.local.get("library"));render()}
+async function send(message){
+ if(busy)return;busy=true;$("notice").textContent="Saving…";render();
+ try{const r=await chrome.runtime.sendMessage(message);if(!r?.ok)throw Error(r?.error||"Could not save");await load();$("notice").textContent="Saved."}
+ catch(e){$("notice").textContent=e.message}finally{busy=false;render()}
+}
+const edit=(key,op,fields={})=>send({type:"libraryEdit",action:{key,op,...fields}});
+function render(){
+ const all=Object.values(library).sort((a,b)=>b.updatedAt-a.updatedAt), chapters=all.flatMap(s=>Object.values(s.chapters));
+ $("stats").replaceChildren(...[["Series",all.length],["Chapters tracked",chapters.length],["Chapters read",chapters.filter(c=>c.completed).length],["Reading",all.filter(s=>(s.status||"reading")==="reading").length]].map(([label,count])=>{const n=node("div",undefined,"stat");n.append(node("strong",count),node("span",label));return n}));
+ const q=$("search").value.trim().toLowerCase(),filter=$("filter").value;
+ const entries=all.filter(s=>s.title.toLowerCase().includes(q)&&(!filter||(s.status||"reading")===filter));
+ $("list").replaceChildren();if(!entries.length){$("list").append(node("p",all.length?"No matching stories.":"Your library is empty. Enable tracking on a reading site to begin.","empty"));return}
+ for(const s of entries){
+  const article=node("article"),head=node("div",undefined,"series-head"),info=node("div"),actions=node("div",undefined,"actions");
+  info.append(node("h2",s.title),node("small",new URL(s.origin).hostname+" · "+Object.keys(s.chapters).length+" chapters · Last: "+s.lastChapter));
+  const select=node("select");select.setAttribute("aria-label","Status for "+s.title);for(const status of statuses){const o=node("option",status);o.value=status;select.append(o)}select.value=s.status||"reading";select.disabled=busy;select.onchange=()=>edit(s.key,"status",{status:select.value});
+  actions.append(select,link(s.chapters[s.lastChapter].url,"Resume"),button("Delete series",()=>{if(confirm("Delete this series and its chapter history? Tracking can add it again."))edit(s.key,"deleteSeries")},"danger"));head.append(info,actions);article.append(head);
+  const details=node("details");details.open=opened.has(s.key);details.ontoggle=()=>{if(details.open)opened.add(s.key);else opened.delete(s.key)};details.append(node("summary","Chapter history"));
+  for(const c of Object.values(s.chapters).sort((a,b)=>Number(b.chapter)-Number(a.chapter))){
+   const row=node("div",undefined,"chapter"),label=node("div"),controls=node("div",undefined,"chapter-actions");label.append(link(c.url,"Chapter "+c.chapter),node("div",c.completed?"Read":c.progress+"% scrolled"));
+   const bar=node("progress");bar.max=100;bar.value=c.progress;bar.setAttribute("aria-label","Scroll progress");label.append(bar);
+   controls.append(button(c.completed?"Mark unread":"Mark read",()=>edit(s.key,"complete",{chapter:c.chapter,completed:!c.completed})));
+   const field=node("input");field.type="text";field.inputMode="decimal";field.value=c.chapter;field.setAttribute("aria-label","Correct chapter "+c.chapter);field.disabled=busy;
+   controls.append(field,button("Correct",()=>edit(s.key,"correct",{chapter:c.chapter,newChapter:field.value})),button("Delete",()=>{if(confirm("Delete chapter "+c.chapter+"? Tracking can add it again."))edit(s.key,"deleteChapter",{chapter:c.chapter})},"danger"));
+   row.append(label,controls);details.append(row);
+  }
+  article.append(details);$("list").append(article)
+ }
+}
+$("search").oninput=render;$("filter").onchange=render;
+$("export").onclick=()=>{const url=URL.createObjectURL(new Blob([JSON.stringify({version:1,library},null,2)],{type:"application/json"}));const a=node("a");a.href=url;a.download="inktrail-library.json";a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)};
+$("import").onclick=()=>$("file").click();
+$("file").onchange=async()=>{const file=$("file").files[0];$("file").value="";if(!file)return;if(file.size>10*1024*1024){$("notice").textContent="Backup exceeds 10 MB.";return}try{const data=JSON.parse(await file.text());if(confirm("Merge this backup into your library? Existing series are retained."))await send({type:"libraryImport",data})}catch(e){$("notice").textContent="Invalid backup: "+e.message}};
+chrome.storage.onChanged.addListener((changes,area)=>{if(area==="local"&&changes.library)load().catch(()=>{})});
+load().catch(e=>$("notice").textContent=e.message);
