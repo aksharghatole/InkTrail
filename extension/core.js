@@ -80,6 +80,11 @@ function editLibrary(library,action,now){
  if(["link","unlink","renameGroup"].includes(action.op))return groupEdit(library,action);
  const s=library[key], next={...library}, chapters={...s.chapters};
  if(action.op==="deleteSeries"){delete next[key];return next;}
+ if(action.op==="catalog"){
+  if(!["anilist","mal"].includes(action.provider))throw Error("Unsupported catalog");
+  const catalog={...cleanCatalog(s.catalog),[action.provider]:catalogReference(action.provider,action.input,action.progress)};
+  next[key]={...s,catalog};return next;
+ }
  if(action.op==="status"){
   if(!["reading","completed","paused","planned","dropped"].includes(action.status))throw Error("Invalid status");
   next[key]={...s,status:action.status};return next;
@@ -143,7 +148,7 @@ function validateBackup(data){
    if(parsed.origin===s.origin&&!parsed.username&&!parsed.password&&Object.hasOwn(chapters,chapter))corrections[canonicalReaderUrl(parsed)]=chapter;
   }
   const group=typeof s.groupId==="string"&&s.groupId.startsWith("linked:")&&s.groupId.length<=2048&&typeof s.groupTitle==="string"&&s.groupTitle.trim()&&s.groupTitle.length<=180?{groupId:s.groupId,groupTitle:s.groupTitle.trim()}:{};
-  safe[key]={...group,key,title:s.title,origin:s.origin,chapters,lastChapter:s.lastChapter,updatedAt:s.updatedAt,corrections,status:["reading","completed","paused","planned","dropped"].includes(s.status)?s.status:"reading"};
+  safe[key]={...group,catalog:cleanCatalog(s.catalog),key,title:s.title,origin:s.origin,chapters,lastChapter:s.lastChapter,updatedAt:s.updatedAt,corrections,status:["reading","completed","paused","planned","dropped"].includes(s.status)?s.status:"reading"};
  }
  return safe;
 }
@@ -161,7 +166,7 @@ function combineLibraries(current, incoming){
    chapters[id]={...latest,...(prev.url===c.url&&(prev.manual===true||c.manual===true)?{manual:true}:{}),readingSeconds:Math.max(prev.readingSeconds||0,c.readingSeconds||0),progress:Math.max(prev.progress,c.progress),completed:typeof manual==="boolean"?manual:prev.completed||c.completed,...(typeof manual==="boolean"?{manualCompletion:manual}:{})};
   }
   const latest=s.updatedAt>old.updatedAt?s:old;
-  result[key]={...latest,...(old.groupId?{groupId:old.groupId,groupTitle:old.groupTitle}:s.groupId?{groupId:s.groupId,groupTitle:s.groupTitle}:{}),chapters,corrections:{...s.corrections,...old.corrections}};
+  result[key]={...latest,catalog:{...cleanCatalog(s.catalog),...cleanCatalog(old.catalog)},...(old.groupId?{groupId:old.groupId,groupTitle:old.groupTitle}:s.groupId?{groupId:s.groupId,groupTitle:s.groupTitle}:{}),chapters,corrections:{...s.corrections,...old.corrections}};
  }
  return result;
 }
@@ -327,4 +332,50 @@ function progressLabel(c){
  if(c.page)return "Page "+c.page.current+(c.page.total?" / "+c.page.total:"");
  return c.progress+"% scrolled";
 }
-if(typeof module!=='undefined')module.exports={detect,keyFor,mergeEntry,canonicalReaderUrl,editLibrary,validateBackup,combineLibraries,titleIdentity,groupedLibrary,cleanPosition,resumeOffset,sessionDelta,formatReadingTime,manualReading,manualMatch,saveManual,chapterRoute,cleanPage,readerPage,pageProgress,progressLabel};
+function catalogId(provider,input){
+ if(!["anilist","mal"].includes(provider))throw Error("Unsupported catalog");
+ const raw=String(input??"").trim();
+ if(!raw)return null;
+ let id=raw;
+ if(!/^\d+$/.test(raw)){
+  let u;try{u=new URL(raw)}catch{throw Error("Enter a manga catalog ID or URL")}
+  const hosts=provider==="anilist"?["anilist.co","www.anilist.co"]:["myanimelist.net","www.myanimelist.net"];
+  if(u.protocol!=="https:"||!hosts.includes(u.hostname)||u.username||u.password||u.port)throw Error("Invalid catalog URL");
+  const m=u.pathname.match(/^\/manga\/(\d+)(?:\/|$)/);
+  if(!m)throw Error("Use a manga entry URL, not an anime or search page");
+  id=m[1];
+ }
+ if(!/^\d{1,10}$/.test(id)||Number(id)<1||Number(id)>2147483647)throw Error("Invalid manga catalog ID");
+ return String(Number(id));
+}
+function catalogUrl(provider,id){
+ if(!["anilist","mal"].includes(provider)||typeof id!=="string"||!/^[1-9]\d{0,9}$/.test(id)||Number(id)>2147483647)return null;
+ return (provider==="anilist"?"https://anilist.co/manga/":"https://myanimelist.net/manga/")+id;
+}
+function catalogSearch(provider,title){
+ if(provider==="anilist")return "https://anilist.co/search/manga?search="+encodeURIComponent(title);
+ if(provider==="mal")return "https://myanimelist.net/manga.php?q="+encodeURIComponent(title);
+ throw Error("Unsupported catalog");
+}
+function catalogReference(provider,input,progress){
+ const id=catalogId(provider,input);
+ if(id===null)return null;
+ const raw=String(progress??"").trim();
+ if(raw&&!/^\d+(?:\.\d+)?$/.test(raw))throw Error("Enter a non-negative numeric reference chapter");
+ const value=raw?String(Number(raw)):null;
+ if(value!==null&&(!/^\d+(?:\.\d+)?$/.test(value)||Number(value)>1000000))throw Error("Invalid reference chapter");
+ return {id,progress:value};
+}
+function cleanCatalog(input){
+ const out={};
+ if(!input||typeof input!=="object"||Array.isArray(input))return out;
+ for(const provider of ["anilist","mal"]){
+  if(!Object.hasOwn(input,provider))continue;
+  const ref=input[provider];
+  if(ref===null){out[provider]=null;continue}
+  try{if(typeof ref?.id==="string"&&/^\d+$/.test(ref.id))out[provider]=catalogReference(provider,ref.id,ref.progress)}catch{}
+ }
+ return out;
+}
+
+if(typeof module!=='undefined')module.exports={detect,keyFor,mergeEntry,canonicalReaderUrl,editLibrary,validateBackup,combineLibraries,titleIdentity,groupedLibrary,cleanPosition,resumeOffset,sessionDelta,formatReadingTime,manualReading,manualMatch,saveManual,chapterRoute,cleanPage,readerPage,pageProgress,progressLabel,catalogId,catalogUrl,catalogSearch,catalogReference,cleanCatalog};

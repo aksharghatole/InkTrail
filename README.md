@@ -60,6 +60,10 @@ Open Analytics from Manage library to view daily and rolling 7/30-day active rea
 
 Open Full backup from Manage library to export one unencrypted JSON file containing the library, custom rules, subscriptions, daily reading activity and preferences. Restore previews validated counts before a non-destructive merge. Existing rules, follows and preferences win conflicts; chapter progress uses existing library merge rules. Overlapping daily aggregates keep the larger recorded day instead of adding potentially duplicate time. Separate legacy backups remain supported on their original pages. Cached release feeds, alert counts, permissions and temporary picker drafts are not exported. Restored subscriptions can resume checking if API access already exists; otherwise grant access manually. Notification delivery is not enabled by import. Activity outside the retained date window is discarded. Keep the backup private.
 
+## External catalog references
+
+In Manage library, expand External catalog references on a source. Find a title on AniList or MyAnimeList using an explicit external search link, then paste the manga ID or entry URL. Optionally record an external chapter number as a local reference. These references do not mark chapters read, replace reader URLs, or synchronize account data. Both providers can be linked independently. References are included in library and full backups; local values (including explicit removals) take precedence on merge. InkTrail makes no AniList or MyAnimeList API requests and stores no account tokens. Automatic AniList API lookup and public list imports are deferred pending provider authorization because its API terms restrict competing tracker services (https://docs.anilist.co/guide/terms-of-use).
+
 ## Privacy
 
 Only user-enabled websites are eligible for tracking. Page headings, titles, URL paths, image counts and scroll position are processed locally. Reading history is not sent to a server. Optional release checks send selected MangaDex title IDs and languages to its public API. Disabling a site retains past history; uninstalling removes local data. Export before uninstalling.
