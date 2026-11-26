@@ -1,0 +1,22 @@
+name: Extension checks
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --test tests/*.test.cjs
+      - run: for f in extension/*.js; do node --check "$f" || exit 1; done
+      - run: node -e "JSON.parse(require('fs').readFileSync('extension/manifest.json','utf8'))"
+      - run: cd extension && zip -r ../inktrail-extension.zip .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: inktrail-extension
+          path: inktrail-extension.zip
