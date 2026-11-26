@@ -8,9 +8,10 @@ function historyCandidates(items,origin){
  const detectReading=historyCore?.detect||detect;
  const identity=historyCore?.keyFor||keyFor;
  const target=historyOrigin(origin), result=new Map();
- for(const item of items.slice(0,1000)){
+ for(const item of (Array.isArray(items)?items:[]).slice(0,1000)){
+  if(!item||typeof item.url!=='string')continue;
   let u;try{u=new URL(item.url)}catch{continue}
-  if(u.origin!==target||u.username||u.password||!Number.isFinite(item.lastVisitTime)||item.lastVisitTime<=0)continue;
+  if(u.origin!==target||u.username||u.password||!Number.isFinite(item.lastVisitTime)||item.lastVisitTime<=0||item.lastVisitTime>Date.now()+60000)continue;
   const known=u.hostname==="mangadex.org"||u.hostname.endsWith(".mangadex.org")||u.hostname==="webtoons.com"||u.hostname.endsWith(".webtoons.com");
   if(!known&&!/(?:^|[\/_-])(?:chapter|chapitre|capitulo|kapitel|chap|ch|episode|ep)[\/_.:#-]*\d+(?:[.,]\d+)?(?=$|[\/_-])/i.test(u.pathname))continue;
   const reading=detectReading({url:u.href,title:String(item.title||"").slice(0,500)});
