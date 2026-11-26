@@ -70,3 +70,18 @@ chrome.runtime.onMessage.addListener((msg,sender,reply)=>{
 });
 
 chrome.runtime.onInstalled.addListener(async details=>{if(details.reason!=="update")return;try{const scripts=await chrome.scripting.getRegisteredContentScripts();const updates=scripts.filter(s=>s.id.startsWith("site-")&&s.js?.includes("content.js")).map(s=>({id:s.id,js:["core.js","rules-core.js","content.js"]}));if(updates.length)await chrome.scripting.updateContentScripts(updates)}catch(e){console.warn("InkTrail registration update failed",e)}});
+
+chrome.runtime.onMessage.addListener((msg,sender,reply)=>{
+ if(msg?.type!=="pickerDraft"||sender.id!==chrome.runtime.id||sender.frameId!==0||!sender.tab||!sender.url)return;
+ (async()=>{
+  const u=new URL(sender.url);
+  if(!["http:","https:"].includes(u.protocol))throw Error("Unsupported page");
+  const parts=u.pathname.split("/").filter(Boolean);
+  const path=parts.length>1?"/"+parts[0]+"/":"/";
+  const rule=validateRule({origin:u.origin,path,titleSelector:msg.titleSelector,chapterSelector:msg.chapterSelector});
+  await chrome.storage.session.set({["picker:"+sender.tab.id]:{rule,createdAt:Date.now()}});
+  return {ok:true};
+ })().then(reply,e=>reply({ok:false,error:String(e.message||e)}));
+ return true;
+});
+chrome.tabs.onRemoved.addListener(id=>{chrome.storage.session.remove("picker:"+id).catch(()=>{})});
