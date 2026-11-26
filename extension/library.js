@@ -1,6 +1,6 @@
 const $=id=>document.getElementById(id);
 let library={},busy=false;
-const opened=new Set();
+const opened=new Set(),catalogOpened=new Set();
 const statuses=["reading","completed","paused","planned","dropped"];
 function node(tag,text,cls){const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(cls)n.className=cls;return n}
 function button(text,fn,cls="secondary"){const b=node("button",text,cls);b.disabled=busy;b.addEventListener("click",fn);return b}
@@ -45,6 +45,17 @@ function render(){
    linking.append(picker,join);
   }
   article.append(linking);
+  const catalog=node("details");catalog.open=catalogOpened.has(s.key);catalog.ontoggle=()=>{if(catalog.open)catalogOpened.add(s.key);else catalogOpened.delete(s.key)};catalog.append(node("summary","External catalog references"));
+  catalog.append(node("small","Optional local references. No account sync. Reference chapters do not change tracked progress."));
+  for(const [provider,label] of [["anilist","AniList"],["mal","MyAnimeList"]]){
+   const ref=s.catalog?.[provider],row=node("div",undefined,"actions link-controls"),id=node("input"),progress=node("input");
+   id.value=ref?.id||"";id.placeholder=label+" manga ID or URL";id.setAttribute("aria-label",label+" manga ID or URL for "+s.title);id.maxLength=300;id.disabled=busy;
+   progress.value=ref?.progress??"";progress.placeholder="Reference chapter";progress.inputMode="decimal";progress.setAttribute("aria-label",label+" reference chapter for "+s.title);progress.maxLength=16;progress.disabled=busy;
+   row.append(link(catalogSearch(provider,s.title),"Find on "+label),id,progress,button("Save "+label,()=>edit(s.key,"catalog",{provider,input:id.value,progress:progress.value})));
+   if(ref&&catalogUrl(provider,ref.id))row.append(link(catalogUrl(provider,ref.id),"Open "+label),button("Remove "+label,()=>edit(s.key,"catalog",{provider,input:""})));
+   catalog.append(row);
+  }
+  article.append(catalog);
   const details=node("details");details.open=opened.has(s.key);details.ontoggle=()=>{if(details.open)opened.add(s.key);else opened.delete(s.key)};details.append(node("summary","Chapter history"));
   for(const c of Object.values(s.chapters).sort((a,b)=>Number(b.chapter)-Number(a.chapter))){
    const row=node("div",undefined,"chapter"),label=node("div"),controls=node("div",undefined,"chapter-actions");label.append(link(c.url,"Chapter "+c.chapter),node("div",(c.completed?"Read":c.progress+"% progress")+" · "+formatReadingTime(c.readingSeconds)+" active"));

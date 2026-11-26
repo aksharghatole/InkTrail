@@ -1,0 +1,16 @@
+const test=require("node:test"),assert=require("node:assert/strict");
+const {catalogId,catalogUrl,catalogSearch,catalogReference,cleanCatalog,editLibrary,mergeEntry,validateBackup,combineLibraries,keyFor}=require("../extension/core.js");
+const reading={title:"Moon",chapter:"2",origin:"https://example.org",url:"https://example.org/read/2",progress:40,completed:false};
+const key=keyFor(reading),library={[key]:mergeEntry(null,reading,1)};
+const set=(lib,provider,input,progress)=>editLibrary(lib,{key,op:"catalog",provider,input,progress},2);
+test("AniList manga URL normalizes ID",()=>assert.equal(catalogId("anilist","https://anilist.co/manga/12345/Moon/?x=1"),"12345"));
+test("MyAnimeList manga URL normalizes ID",()=>assert.equal(catalogId("mal","https://myanimelist.net/manga/12/Moon"),"12"));
+test("invalid catalog URLs rejected",()=>{for(const url of ["https://anilist.co/anime/1","https://anilist.co.evil.test/manga/1","http://anilist.co/manga/1","https://user:pass@anilist.co/manga/1","javascript:alert(1)"])assert.throws(()=>catalogId("anilist",url))});
+test("IDs bounded and normalized",()=>{assert.equal(catalogId("mal","00012"),"12");for(const n of ["0","99999999999","2147483648"])assert.throws(()=>catalogId("mal",n))});
+test("catalog links and searches are fixed destinations",()=>{assert.equal(catalogUrl("anilist","12"),"https://anilist.co/manga/12");assert.equal(catalogUrl("mal","12/evil"),null);assert.equal(catalogSearch("mal","Moon & Sun"),"https://myanimelist.net/manga.php?q=Moon%20%26%20Sun")});
+test("reference progress never changes chapter history",()=>{const s=set(library,"anilist","12","9.5")[key];assert.deepEqual(s.chapters,library[key].chapters);assert.equal(s.lastChapter,"2");assert.deepEqual(s.catalog.anilist,{id:"12",progress:"9.5"})});
+test("two providers can coexist and remove independently",()=>{const a=set(set(library,"anilist","12","3"),"mal","42","5");const b=set(a,"anilist","");assert.equal(b[key].catalog.anilist,null);assert.equal(b[key].catalog.mal.id,"42")});
+test("invalid reference progress rejected",()=>{for(const value of ["-1","abc","1e5","1000001"])assert.throws(()=>catalogReference("mal","12",value))});
+test("catalog references survive library backup and automatic reading updates",()=>{const a=set(library,"anilist","12","3"),b=validateBackup({version:1,library:a});assert.deepEqual(b[key].catalog.anilist,{id:"12",progress:"3"});assert.deepEqual(mergeEntry(b[key],reading,5).catalog,b[key].catalog)});
+test("existing reference and explicit removal win backup conflicts",()=>{const a=set(library,"anilist","12","3"),b=set(library,"anilist","13","4");assert.equal(combineLibraries(a,b)[key].catalog.anilist.id,"12");assert.equal(combineLibraries(set(a,"anilist",""),b)[key].catalog.anilist,null)});
+test("invalid imported metadata stripped",()=>assert.deepEqual(cleanCatalog({anilist:{id:"https://evil.test"},mal:{id:"42",progress:"9"},extra:{id:"1"}}),{mal:{id:"42",progress:"9"}}));
