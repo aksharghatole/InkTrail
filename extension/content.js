@@ -1,7 +1,7 @@
 (()=>{
  if(globalThis.__inkTrailRunning)return;
  globalThis.__inkTrailRunning=true;
- let key="",lastTime=performance.now(),active=false,visibleSeconds=0,pending=0,lastSaved="",busy=false,offer=null,offerUntil=0,interacted=false,scrollEvidence=false,lastActivity=performance.now();
+ let key="",lastTime=performance.now(),active=false,visibleSeconds=0,pending=0,lastSaved="",busy=false,offer=null,offerUntil=0,interacted=false,awaitingChoice=false,scrollEvidence=false,lastActivity=performance.now();
  const removeOffer=()=>{offer?.remove();offer=null;offerUntil=0};
  function current(){
   return detect({url:location.href,title:document.title,headings:[...document.querySelectorAll("h1,h2")].slice(0,8).map(x=>x.textContent),readerImages:document.querySelectorAll("main img,article img,.reader img,.reading-content img").length});
@@ -19,13 +19,13 @@
   label.textContent="InkTrail · Continue from "+Math.round(pos.top/Math.max(1,pos.range)*100)+"%?";
   go.textContent="Resume";dismiss.textContent="Start here";
   for(const b of [go,dismiss])b.style.cssText="font:inherit;background:#e4c7fa;color:#231a2c;border:0;border-radius:6px;padding:8px;cursor:pointer";
-  go.onclick=()=>{if(key===identity){const p=position();window.scrollTo({top:resumeOffset(pos,p.range),behavior:"instant"});interacted=true;scrollEvidence=false;}removeOffer()};
-  dismiss.onclick=()=>{interacted=true;removeOffer()};
-  box.append(label,go,dismiss);shadow.append(box);document.documentElement.append(host);offer=host;offerUntil=performance.now()+30000;
+  go.onclick=()=>{if(key===identity){const p=position();window.scrollTo({top:resumeOffset(pos,p.range),behavior:"instant"});interacted=true;awaitingChoice=false;scrollEvidence=false;}removeOffer()};
+  dismiss.onclick=()=>{interacted=true;awaitingChoice=false;removeOffer()};
+  box.append(label,go,dismiss);shadow.append(box);document.documentElement.append(host);offer=host;awaitingChoice=true;offerUntil=performance.now()+30000;
  }
  for(const event of ["pointerdown","keydown","wheel","touchmove"]){
   addEventListener(event,e=>{if(!e.isTrusted)return;lastActivity=performance.now();if(event==="wheel"||event==="touchmove"||(event==="keydown"&&["ArrowDown","ArrowUp","PageDown","PageUp"," ","End","Home"].includes(e.key)))scrollEvidence=true;
-   if(!offer)interacted=true;
+   if(!offer){interacted=true;awaitingChoice=false;}
   },{passive:true,capture:true});
  }
  async function tick(){
@@ -38,14 +38,14 @@
    if(!r){key="";visibleSeconds=0;pending=0;removeOffer();return;}
    const next=r.url+"|"+r.title+"|"+r.chapter;
    if(key!==next){
-    key=next;visibleSeconds=0;pending=0;lastSaved="";interacted=false;scrollEvidence=false;removeOffer();
+    key=next;visibleSeconds=0;pending=0;lastSaved="";interacted=false;awaitingChoice=false;scrollEvidence=false;removeOffer();
     const lookup=await chrome.runtime.sendMessage({type:"resumeLookup",reading:{...r,progress:0}});
     if(lookup?.ok&&!lookup.completed&&position().top<150)showOffer(lookup.position,next);
     return;
    }
    visibleSeconds+=delta;pending=Math.min(15,pending+delta);
    if(offer&&now>=offerUntil)removeOffer();
-   if(offer)return;
+   if(offer||awaitingChoice)return;
    const p=position(),progress=p.range>100?Math.round(p.top/p.range*100):0;
    const completed=visibleSeconds>=30&&progress>=90&&scrollEvidence;
    const signature=next+"|"+Math.round(p.top/20)+"|"+progress+"|"+completed;
