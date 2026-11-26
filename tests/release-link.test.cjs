@@ -1,0 +1,14 @@
+const test=require("node:test"),assert=require("node:assert/strict");
+const {completedForFollow,unseenChapters,applyFeed,followSuggestions,exportFollows,validateFollowsBackup,mergeFollows}=require("../extension/release-core.js");
+const id="12345678-1234-1234-1234-123456789abc",f={id,language:"en",title:"Blue Moon",readThrough:"2",libraryKey:"a",chapters:[{chapter:"6"},{chapter:"5"},{chapter:"4"},{chapter:"3"},{chapter:"2"}]};
+const library={a:{key:"a",title:"Blue Moon",groupId:"linked",chapters:{"5":{chapter:"5",completed:true},"4":{chapter:"4",completed:false}}},b:{key:"b",title:"Azure Moon",groupId:"linked",chapters:{"3":{chapter:"3",completed:true}}},c:{key:"c",title:"Other",chapters:{"6":{chapter:"6",completed:true}}}};
+test("excludes completed linked chapters individually, preserves gaps",()=>assert.deepEqual(unseenChapters(f,library).map(c=>c.chapter),["6","4"]));
+test("unlinked sources cannot change unread count",()=>assert.deepEqual(unseenChapters({...f,libraryKey:undefined},library).map(c=>c.chapter),["6","5","4","3"]));
+test("missing link falls back to manual baseline",()=>assert.equal(unseenChapters({...f,libraryKey:"missing"},library).length,4));
+test("manual unread remains unread unless another linked source completed it",()=>assert.equal(completedForFollow(f,library).has("4"),false));
+test("new alert excludes already completed linked chapter",()=>{const prev={...f,checkedAt:1,highest:"4",chapters:[{chapter:"4"}]};assert.equal(applyFeed(prev,[{chapter:"6"},{chapter:"5"}],2,library).pending,1)});
+test("suggestions prioritize exact normalized title",()=>assert.equal(followSuggestions({...f,title:"BLUE—MOON"},library)[0].key,"a"));
+test("backup restores subscription link but no cached feed or alert",()=>{const restored=Object.values(validateFollowsBackup(exportFollows({x:{...f,pending:3}})))[0];assert.equal(restored.libraryKey,"a");assert.equal(restored.pending,0);assert.deepEqual(restored.chapters,[])});
+test("invalid subscription backup rejected",()=>assert.throws(()=>validateFollowsBackup({version:1,subscriptions:[{...f,id:"bad"}]})));
+test("import keeps existing subscription",()=>{const current={x:f},incoming={x:{...f,readThrough:"99"}};assert.equal(mergeFollows(current,incoming).x.readThrough,"2")});
+test("backup rejects duplicate follows",()=>assert.throws(()=>validateFollowsBackup({version:1,subscriptions:[f,f]}),/Duplicate/));

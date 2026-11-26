@@ -28,7 +28,8 @@ async function checkRelease(follows,key){
  follows[key]={...f,attemptAt};await saveFollows(follows);
  try{
   const chapters=await fetchFeed(f);
-  follows[key]={...applyFeed(f,chapters,Date.now()),attemptAt};
+  const {library={}}=await chrome.storage.local.get('library');
+  follows[key]={...applyFeed(f,chapters,Date.now(),library),attemptAt};
  }catch(e){follows[key]={...f,attemptAt,error:String(e.message||e).slice(0,240)};}
  await saveFollows(follows);
  return follows[key];
@@ -46,12 +47,24 @@ async function releaseAction(msg){
   await saveFollows(follows);await ensureReleaseAlarm();
   return {ok:true};
  }
+ if(msg.op==="import"){
+  if(!await chrome.permissions.contains({origins:[releaseOrigin]}))throw Error("Enable API access first");
+  await saveFollows(mergeFollows(follows,validateFollowsBackup(msg.data)));await ensureReleaseAlarm();return {ok:true};
+ }
  if(msg.op==="ackAll"){
   for(const f of Object.values(follows))f.pending=0;
   await saveFollows(follows);return {ok:true};
  }
  const key=msg.key;
  if(typeof key!=="string"||!Object.hasOwn(follows,key))throw Error("Follow not found");
+ if(msg.op==="linkLibrary"){
+  const {library={}}=await chrome.storage.local.get("library");
+  if(typeof msg.libraryKey!=="string"||!Object.hasOwn(library,msg.libraryKey))throw Error("Reading source not found");
+  follows[key]={...follows[key],libraryKey:msg.libraryKey};await saveFollows(follows);return {ok:true};
+ }
+ if(msg.op==="unlinkLibrary"){
+  const {libraryKey,...rest}=follows[key];follows[key]=rest;await saveFollows(follows);return {ok:true};
+ }
  if(msg.op==="unfollow"){delete follows[key];await saveFollows(follows);return {ok:true};}
  if(msg.op==="readThrough"){
   const value=chapterNumber(String(msg.value));if(value===null)throw Error("Enter a numeric chapter");
