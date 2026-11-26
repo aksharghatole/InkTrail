@@ -9,7 +9,7 @@ function canonicalReaderUrl(u){
  const kind=readerKind(u);
  if(kind==="webtoon"&&/\/viewer\/?$/.test(u.pathname)){
   const parts=[];
-  for(const k of ["title_no","episode_no"]){const v=u.searchParams.get(k);if(v&&/^\d+$/.test(v))parts.push(k+"="+v);}
+  for(const k of ["title_no","episode_no"]){const v=u.searchParams.get(k);if(v&&/^\d{1,15}$/.test(v)&&Number(v)>0&&u.searchParams.getAll(k).length===1)parts.push(k+"="+v);}
   return u.origin+u.pathname+(parts.length===2?"?"+parts.join("&"):"");
  }
  return u.origin+u.pathname;
@@ -17,7 +17,7 @@ function canonicalReaderUrl(u){
 
 function detect(input){
  let u;try{u=new URL(input.url)}catch{return null}
- if(!["http:","https:"].includes(u.protocol))return null;
+ if(!["http:","https:"].includes(u.protocol)||u.username||u.password)return null;
  let path;try{path=decodeURIComponent(u.pathname)}catch{path=u.pathname}
  const kind=readerKind(u);
  const clean=s=>String(s||"").normalize("NFKC").replace(/\s+/g," ").trim();
@@ -36,7 +36,7 @@ function detect(input){
   const parts=path.split("/").filter(Boolean);
   name=slugName(parts[2]||"");
  }else if(kind==="mangadex"){
-  if(!/^\/chapter\/[a-f0-9-]{36}(?:\/\d+)?\/?$/i.test(path))return null;
+  if(!/^\/chapter\/[a-f\d]{8}-[a-f\d]{4}-[a-f\d]{4}-[a-f\d]{4}-[a-f\d]{12}(?:\/[1-9]\d*)?\/?$/i.test(path))return null;
   chapter=matches[0]?.m[1];
  }else{
   const context=[u.hostname,path,title,...headings].join(" ");
@@ -46,7 +46,7 @@ function detect(input){
   chapter=p?.[1]||matches[0]?.m[1];
   if(p&&re.test(title)&&number(title.match(re)[1])!==number(chapter))return null;
  }
- if(chapter===undefined||!Number.isFinite(number(chapter)))return null;
+ if(chapter===undefined||!Number.isFinite(number(chapter))||number(chapter)>1000000||!/^\d+(?:\.\d+)?$/.test(String(number(chapter))))return null;
  for(const {s,m} of matches){
   if(number(m[1])!==number(chapter))continue;
   const prefix=clean(s.slice(0,m.index).replace(/[\s|:–—-]+$/g,"")).replace(/^read\s+/i,"");
