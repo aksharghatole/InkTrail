@@ -1,5 +1,7 @@
 # InkTrail
 
+[Install](#install-developer-mode) · [Current scope](#current-scope) · [Feature reference](#feature-reference)
+
 Every chapter. Every story. Never lose your place.
 
 Local-first manga, manhua and manhwa reading tracker for Chromium browsers. No account, backend, paid API or analytics.
@@ -15,6 +17,11 @@ Local-first manga, manhua and manhwa reading tracker for Chromium browsers. No a
 ## Current scope
 
 Generic chapter detection from URLs, headings and titles, including decimals, English, French, Spanish, German and common CJK numeric labels. MangaDex chapter routes and WEBTOON viewer routes have initial fixture-tested adapters. WEBTOON preserves only numeric title_no and episode_no identifiers for resume; all other query parameters are removed. On WEBTOON the visible episode label is preferred to the internal episode identifier. Completion is a heuristic (30 focused active seconds, a scroll-related input and 90% page scroll); short or paginated readers may not complete automatically. The extension saves local progress, strips most URL query strings and all fragments, and offers to restore a saved scroll position on reopening an unfinished chapter. Query-dependent readers may not resume correctly. Sources are recorded independently and can be explicitly linked into a unified story across websites. Live website compatibility has not yet been verified.
+
+## Feature reference
+
+<details>
+<summary>Library management, detection details and testing</summary>
 
 ## Manage your library
 
@@ -77,3 +84,5 @@ No build step or dependencies. Run `node --test tests/*.test.cjs` with Node 22. 
 ## Roadmap
 
 More site adapters, broader paginated reader support, additional release sources, optional sync.
+
+</details>
