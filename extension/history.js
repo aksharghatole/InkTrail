@@ -1,7 +1,7 @@
 const $=id=>document.getElementById(id);
 let candidates=[],selection=new Set(),busy=false;
 function el(tag,text){const n=document.createElement(tag);if(text!==undefined)n.textContent=text;return n}
-function updateCount(){$("count").textContent=selection.size+" selected / "+candidates.length+" candidates";$("save").disabled=busy||!selection.size;}
+function updateCount(){$("count").textContent=selection.size+" selected / "+candidates.length+" candidates";$("save").disabled=busy||!selection.size;for(const id of ["origin","days","all","none","revoke"])$(id).disabled=busy;$("scan").querySelector("button[type=submit]").disabled=busy;for(const check of $("list").querySelectorAll("input[type=checkbox]"))check.disabled=busy;}
 function render(){
  $("preview").hidden=!candidates.length;$("list").replaceChildren();
  for(const [i,r] of candidates.entries()){
@@ -34,5 +34,5 @@ $("save").onclick=async()=>{
  }catch(e){$("notice").textContent=e.message}finally{busy=false;render()}
 };
 $("revoke").onclick=async()=>{
- if(busy)return;try{await chrome.permissions.remove({permissions:["history"]});candidates=[];selection.clear();render();$("notice").textContent="History permission removed. Imported chapters retained."}catch(e){$("notice").textContent=e.message}
+ if(busy)return;busy=true;updateCount();try{await chrome.permissions.remove({permissions:["history"]});candidates=[];selection.clear();render();$("notice").textContent="History permission removed. Imported chapters retained."}catch(e){$("notice").textContent=e.message}finally{busy=false;updateCount()}
 };
