@@ -32,6 +32,7 @@ function render(){
   for(const c of g.chapters){const row=node("div",undefined,"chapter");row.append(node("strong","Chapter "+c.chapter+" · "+(c.completed?"Read":c.progress+"% progress")));const links=node("div",undefined,"actions");for(const source of c.links)links.append(link(source.url,new URL(source.origin).hostname+" · "+source.title));row.append(links);detail.append(row)}
   card.append(detail);$("groups").append(card);
  }
+ $("matchCount").textContent=`Showing ${entries.length} of ${all.length} sources`;
  $("list").replaceChildren();if(!entries.length){$("list").append(node("p",all.length?"No matching stories.":"Your library is empty. Enable tracking on a reading site to begin.","empty"));return}
  for(const s of entries){
   const article=node("article"),head=node("div",undefined,"series-head"),info=node("div"),actions=node("div",undefined,"actions");
@@ -70,7 +71,7 @@ function render(){
   article.append(details);$("list").append(article)
  }
 }
-$("search").oninput=render;$("filter").onchange=render;$("sort").onchange=render;
+$("search").oninput=render;$("filter").onchange=render;$("sort").onchange=render;$("resetFilters").onclick=()=>{$("search").value="";$("filter").value="";$("sort").value="recent";render()};
 $("export").onclick=()=>{const url=URL.createObjectURL(new Blob([JSON.stringify({version:1,library},null,2)],{type:"application/json"}));const a=node("a");a.href=url;a.download="inktrail-library.json";a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)};
 $("import").onclick=()=>$("file").click();
 $("file").onchange=async()=>{const file=$("file").files[0];$("file").value="";if(!file)return;if(file.size>10*1024*1024){$("notice").textContent="Backup exceeds 10 MB.";return}try{const data=JSON.parse(await file.text());if(confirm("Merge this backup into your library? Existing series are retained."))await send({type:"libraryImport",data})}catch(e){$("notice").textContent="Invalid backup: "+e.message}};
