@@ -38,5 +38,12 @@ test("Chromium extension loads, picks elements and imports a reading library",{t
   await library.getByRole("button",{name:"Mark unread",exact:true}).waitFor();
   const stored=await worker.evaluate(async key=>(await chrome.storage.local.get("library")).library[key],key);
   assert.equal(stored.chapters["12.5"].completed,true);
+  await library.locator('#search').fill('127.0.0.1');
+  await library.getByRole('heading',{name:'Fixture Moon',exact:true}).waitFor();
+  await library.locator('#search').fill('no matching title');
+  await library.getByText('No matching stories.').waitFor();
+  await library.locator('#search').fill('');
+  await library.locator('#sort').selectOption('unread');
+  await library.getByRole('heading',{name:'Fixture Moon',exact:true}).waitFor();
  }finally{if(context)await context.close();await new Promise(resolve=>server.close(resolve));await fs.rm(temp,{recursive:true,force:true})}
 });

@@ -13,10 +13,12 @@ async function send(message){
 }
 const edit=(key,op,fields={})=>send({type:"libraryEdit",action:{key,op,...fields}});
 function render(){
- const all=Object.values(library).sort((a,b)=>b.updatedAt-a.updatedAt), groups=groupedLibrary(library), chapters=groups.flatMap(g=>g.chapters);
+ const sort=$("sort").value, unread=s=>Object.values(s.chapters).filter(c=>!c.completed).length;
+ const compare=(a,b)=>sort==="title"?a.title.localeCompare(b.title):sort==="unread"?unread(b)-unread(a)||b.updatedAt-a.updatedAt:b.updatedAt-a.updatedAt;
+ const all=Object.values(library).sort(compare), groups=groupedLibrary(library), chapters=groups.flatMap(g=>g.chapters);
  $("stats").replaceChildren(...[["Stories",groups.length],["Sources",all.length],["Unique chapters",chapters.length],["Chapters read",chapters.filter(c=>c.completed).length],["Active reading",formatReadingTime(all.flatMap(s=>Object.values(s.chapters)).reduce((n,c)=>n+(c.readingSeconds||0),0))]].map(([label,count])=>{const n=node("div",undefined,"stat");n.append(node("strong",count),node("span",label));return n}));
  const q=$("search").value.trim().toLowerCase(),filter=$("filter").value;
- const entries=all.filter(s=>(s.title.toLowerCase().includes(q)||(s.groupTitle||"").toLowerCase().includes(q))&&(!filter||(s.status||"reading")===filter));
+ const entries=all.filter(s=>(s.title.toLowerCase().includes(q)||(s.groupTitle||"").toLowerCase().includes(q)||new URL(s.origin).hostname.toLowerCase().includes(q))&&(!filter||(s.status||"reading")===filter));
  const visible=new Set(entries.map(s=>s.key));
  $("groups").replaceChildren();
  for(const g of groups.filter(g=>g.sources.length>1&&g.sources.some(s=>visible.has(s.key)))){
@@ -68,7 +70,7 @@ function render(){
   article.append(details);$("list").append(article)
  }
 }
-$("search").oninput=render;$("filter").onchange=render;
+$("search").oninput=render;$("filter").onchange=render;$("sort").onchange=render;
 $("export").onclick=()=>{const url=URL.createObjectURL(new Blob([JSON.stringify({version:1,library},null,2)],{type:"application/json"}));const a=node("a");a.href=url;a.download="inktrail-library.json";a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)};
 $("import").onclick=()=>$("file").click();
 $("file").onchange=async()=>{const file=$("file").files[0];$("file").value="";if(!file)return;if(file.size>10*1024*1024){$("notice").textContent="Backup exceeds 10 MB.";return}try{const data=JSON.parse(await file.text());if(confirm("Merge this backup into your library? Existing series are retained."))await send({type:"libraryImport",data})}catch(e){$("notice").textContent="Invalid backup: "+e.message}};
