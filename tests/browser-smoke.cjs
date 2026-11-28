@@ -44,6 +44,12 @@ test("Chromium extension loads, picks elements and imports a reading library",{t
   await library.getByText('No matching stories.').waitFor();
   await library.locator('#search').fill('');
   await library.locator('#sort').selectOption('unread');
+  await library.locator('#search').fill('no matching title');
+  await library.getByText('Showing 0 of', {exact:false}).waitFor();
+  await library.locator('#resetFilters').click();
+  assert.equal(await library.locator('#search').inputValue(),'');
+  assert.equal(await library.locator('#sort').inputValue(),'recent');
+  assert.equal(await library.locator('#filter').inputValue(),'');
   await library.getByRole('heading',{name:'Fixture Moon',exact:true}).waitFor();
  }finally{if(context)await context.close();await new Promise(resolve=>server.close(resolve));await fs.rm(temp,{recursive:true,force:true})}
 });
