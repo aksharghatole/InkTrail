@@ -11,3 +11,10 @@ test("older visits cannot replace current resume chapter",()=>{const a=importHis
 test("invalid URLs and origin rejected",()=>{assert.throws(()=>historyOrigin(origin+"/read"));assert.throws(()=>importHistory({},[{title:"Moon",chapter:"1",origin,url:"javascript:alert(1)",visitedAt:time}]))});
 
 test("malformed history entries and future visits are ignored",()=>{assert.deepEqual(historyCandidates(null,origin),[]);const c=historyCandidates([null,{},row(1,{lastVisitTime:Date.now()+120000}),row(2)],origin);assert.equal(c.length,1);assert.equal(c[0].chapter,"2")});
+
+test("history recognizes the same localized routes as live detection",()=>{
+ const rows=["cap%C3%ADtulo","capitolo","epis%C3%B3dio","episodio","%C3%A9pisode"].map((segment,i)=>row(i+1,{url:origin+"/manga/moon/"+segment+"-"+(i+1),title:"Moon Chapter "+(i+1)}));
+ const candidates=historyCandidates([...rows,{...rows[0],url:rows[0].url+"?token=secret"}],origin);
+ assert.equal(candidates.length,5);
+ assert.equal(importHistory({},candidates).added,5);
+});

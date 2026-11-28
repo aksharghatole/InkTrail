@@ -15,15 +15,22 @@ function canonicalReaderUrl(u){
  return u.origin+u.pathname;
 }
 
+function readerPath(u){
+ try{return decodeURIComponent(u.pathname)}catch{return u.pathname}
+}
+function chapterPathMatch(path){
+ return path.match(/(?:^|[\/_-])(?:chapter|chapitre|cap[ií]tulo|capitolo|kapitel|chap|ch|[eé]pisode|epis[oó]dio|ep)[\/_.:#-]*(\d+(?:[.,]\d+)?)(?=$|[\/_-])/i);
+}
+
 function detect(input){
  let u;try{u=new URL(input.url)}catch{return null}
  if(!["http:","https:"].includes(u.protocol)||u.username||u.password)return null;
- let path;try{path=decodeURIComponent(u.pathname)}catch{path=u.pathname}
+ const path=readerPath(u);
  const kind=readerKind(u);
  const clean=s=>String(s||"").normalize("NFKC").replace(/\s+/g," ").trim();
  const headings=(input.headings||[]).slice(0,8).map(clean),title=clean(input.title);
- const re=/(?:\b(?:chapter|chapitre|cap[ií]tulo|kapitel|chap|ch|episode|ep)[\s._:#-]*|第\s*)(\d+(?:[.,]\d+)?)(?:\s*[話话章回])?(?![\d.,])/i;
- const p=path.match(/(?:^|[\/_-])(?:chapter|chapitre|capitulo|kapitel|chap|ch|episode|ep)[\/_.:#-]*(\d+(?:[.,]\d+)?)(?=$|[\/_-])/i);
+ const re=/(?:(?<![\p{Script=Latin}\d_])(?:chapter|chapitre|cap[ií]tulo|capitolo|kapitel|chap|ch|[eé]pisode|epis[oó]dio|ep)[\s._:#-]*|第\s*)(\d+(?:[.,]\d+)?)(?:\s*[話话章回])?(?![\d.,])/iu;
+ const p=chapterPathMatch(path);
  const matches=[...headings,title].map(s=>({s,m:s.match(re)})).filter(x=>x.m);
  const number=s=>Number(String(s).replace(",","."));
  const slugName=s=>clean(s.replace(/[-_]+/g," "));
@@ -378,4 +385,4 @@ function cleanCatalog(input){
  return out;
 }
 
-if(typeof module!=='undefined')module.exports={detect,keyFor,mergeEntry,canonicalReaderUrl,editLibrary,validateBackup,combineLibraries,titleIdentity,groupedLibrary,cleanPosition,resumeOffset,sessionDelta,formatReadingTime,manualReading,manualMatch,saveManual,chapterRoute,cleanPage,readerPage,pageProgress,progressLabel,catalogId,catalogUrl,catalogSearch,catalogReference,cleanCatalog};
+if(typeof module!=='undefined')module.exports={detect,readerPath,chapterPathMatch,keyFor,mergeEntry,canonicalReaderUrl,editLibrary,validateBackup,combineLibraries,titleIdentity,groupedLibrary,cleanPosition,resumeOffset,sessionDelta,formatReadingTime,manualReading,manualMatch,saveManual,chapterRoute,cleanPage,readerPage,pageProgress,progressLabel,catalogId,catalogUrl,catalogSearch,catalogReference,cleanCatalog};
