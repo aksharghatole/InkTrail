@@ -51,5 +51,34 @@ test("Chromium extension loads, picks elements and imports a reading library",{t
   assert.equal(await library.locator('#sort').inputValue(),'recent');
   assert.equal(await library.locator('#filter').inputValue(),'');
   await library.getByRole('heading',{name:'Fixture Moon',exact:true}).waitFor();
+  const restore=await context.newPage();
+  await restore.goto("chrome-extension://"+id+"/backup.html");
+  await restore.evaluate(()=>{
+    const input=document.getElementById("file");
+    const select=(text,delay)=>{
+      const file=new File([text],"backup.json",{type:"application/json"});
+      file.text=()=>new Promise(resolve=>setTimeout(()=>resolve(text),delay));
+      const transfer=new DataTransfer();transfer.items.add(file);input.files=transfer.files;
+      input.dispatchEvent(new Event("change"));
+    };
+    select("old invalid JSON",150);
+    select("new invalid JSON",0);
+  });
+  await restore.waitForTimeout(250);
+  assert.equal(await restore.locator("#preview").isHidden(),true);
+  // A stale successful read must not replace the newer invalid selection.
+  await restore.evaluate(()=>{
+    const input=document.getElementById("file");
+    const select=(text,delay)=>{
+      const file=new File([text],"backup.json");
+      file.text=()=>new Promise(resolve=>setTimeout(()=>resolve(text),delay));
+      const transfer=new DataTransfer();transfer.items.add(file);input.files=transfer.files;
+      input.dispatchEvent(new Event("change"));
+    };
+    select(JSON.stringify(portableBackup({})),150);
+    select("invalid",0);
+  });
+  await restore.waitForTimeout(250);
+  assert.equal(await restore.locator("#preview").isHidden(),true);
  }finally{if(context)await context.close();await new Promise(resolve=>server.close(resolve));await fs.rm(temp,{recursive:true,force:true})}
 });
